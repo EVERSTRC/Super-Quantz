@@ -128,6 +128,11 @@
         .analysis-title { font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; margin-bottom: 6px; display: flex; justify-content: space-between; }
         .analysis-text { font-size: 0.8rem; line-height: 1.4; color: var(--text-main); }
         .analysis-badge { padding: 2px 6px; border-radius: 3px; font-size: 0.68rem; font-weight: 800; }
+
+        /* NUEVOS ESTILOS PARA RECOMENDACIÓN DE ENTRADA Y SALIDA GLOBAL */
+        .global-trade-card { background: linear-gradient(145deg, rgba(21, 25, 36, 0.95), rgba(11, 14, 20, 0.98)); border: 1px solid var(--cyan); border-radius: 8px; padding: 14px; margin-top: 15px; }
+        .global-trade-header { font-size: 0.88rem; font-weight: 800; color: var(--cyan); margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+        .global-trade-type { font-size: 0.75rem; padding: 3px 8px; border-radius: 4px; text-transform: uppercase; font-weight: 900; }
     </style>
 </head>
 <body>
@@ -335,7 +340,7 @@
 
     </main>
 
-    <!-- SECCIÓN ADICIONAL: ACUMULADO SEMANAL MATRIZ MULTI-BROKER CON ANÁLISIS DE DECISIÓN -->
+    <!-- SECCIÓN ADICIONAL: ACUMULADO SEMANAL MATRIZ MULTI-BROKER CON DIAGNÓSTICO Y RECOMENDACIÓN GLOBAL DE ENTRADA/SALIDA -->
     <section class="panel" style="max-width: 1600px; width: 100%; margin: 0 auto 20px auto;">
         <div class="panel-header">
             <span class="panel-title">📅 Acumulado Semanal - Matriz Multi-Broker por Temporalidad (% Compras / % Ventas)</span>
@@ -388,6 +393,33 @@
                         <div class="analysis-text" id="wk-strategy-text">Evaluando acumulado...</div>
                     </div>
                 </div>
+
+                <!-- TARJETA CON LA MEJOR RECOMENDACIÓN GLOBAL DE ENTRADA Y SALIDA -->
+                <div class="global-trade-card">
+                    <div class="global-trade-header">
+                        <span>🎯 RECOMENDACIÓN OPERATIVA GLOBAL (ENTRADAS / SALIDAS EN VIVO)</span>
+                        <span class="global-trade-type" id="wk-trade-type-badge" style="background-color: var(--green-bg); color: var(--green);">ESPERAR GIRO</span>
+                    </div>
+                    <div class="option-grid">
+                        <div class="option-item">
+                            <div class="lbl">Zona de Entrada Ideal</div>
+                            <div class="val" id="wk-entry-val" style="color: var(--yellow);">$0.00</div>
+                        </div>
+                        <div class="option-item">
+                            <div class="lbl">Stop Loss (Invalidez)</div>
+                            <div class="val" id="wk-sl-val" style="color: var(--red);">$0.00</div>
+                        </div>
+                        <div class="option-item">
+                            <div class="lbl">Salida TP 1 (Resistencia)</div>
+                            <div class="val" id="wk-tp1-val" style="color: var(--green);">$0.00</div>
+                        </div>
+                        <div class="option-item">
+                            <div class="lbl">Salida TP 2 (Extensión)</div>
+                            <div class="val" id="wk-tp2-val" style="color: var(--cyan);">$0.00</div>
+                        </div>
+                    </div>
+                </div>
+
             </div>
 
         </div>
@@ -732,7 +764,7 @@
         };
     </script>
 
-    <!-- MOTOR LÓGICO COMPLEMENTARIO CON ANÁLISIS AUTOMÁTICO EN LA SECCIÓN SEMANAL -->
+    <!-- MOTOR LÓGICO COMPLEMENTARIO CON ANÁLISIS AUTOMÁTICO Y NIVELES GLOBALES DE ENTRADA/SALIDA -->
     <script>
         let weeklyAccumulator = JSON.parse(localStorage.getItem('quantz_weekly_data')) || {
             '1m':  { binance: [], bybit: [], coinbase: [], okx: [] },
@@ -856,7 +888,7 @@
             tbody.innerHTML = html;
         }
 
-        // FUNCIÓN QUE GENERAR Y ACTUALIZA EL DIAGNÓSTICO OPERATIVO AUTOMÁTICO EN LA SECCIÓN SEMANAL
+        // CÁLCULO DINÁMICO DE DIAGNÓSTICO Y RECOMENDACIONES DE ENTRADA Y SALIDA GLOBAL
         function updateWeeklyAnalysis() {
             const getTfAvg = (tf) => {
                 const d = weeklyAccumulator[tf];
@@ -914,30 +946,76 @@
                 intraText.innerText = `Mercado lateral en marcos intermedios. Esperar rompimiento de rango.`;
             }
 
-            // Estrategia combinada
+            // Estrategia combinada y asignación de niveles dinámicos
             const stratBadge = document.getElementById('wk-strategy-badge');
             const stratText = document.getElementById('wk-strategy-text');
+            const tradeTypeBadge = document.getElementById('wk-trade-type-badge');
+
+            const p = currentBtcPrice;
 
             if (microAvg >= 55 && intraAvg <= 45 && avg1D >= 55) {
+                // Divergencia: Micro alcista vs Intradía bajista vs Macro alcista (Ejemplo de la captura)
                 stratBadge.innerText = 'ESPERAR GIRO EN 1H';
                 stratBadge.style.backgroundColor = 'rgba(240, 185, 11, 0.15)';
                 stratBadge.style.color = 'var(--yellow)';
                 stratText.innerText = `Divergencia: El impulso rápido (1m-15m) intenta romper la resistencia de 1h/4h. No comprar hasta que 1h supere el 50% C o retroceda a soporte.`;
+
+                tradeTypeBadge.innerText = 'ENTRADA EN RETROCESO (LONG)';
+                tradeTypeBadge.style.backgroundColor = 'var(--green-bg)';
+                tradeTypeBadge.style.color = 'var(--green)';
+
+                document.getElementById('wk-entry-val').innerText = `$${(p * 0.993).toFixed(1)}`;
+                document.getElementById('wk-sl-val').innerText = `$${(p * 0.985).toFixed(1)}`;
+                document.getElementById('wk-tp1-val').innerText = `$${(p * 1.012).toFixed(1)}`;
+                document.getElementById('wk-tp2-val').innerText = `$${(p * 1.028).toFixed(1)}`;
+
             } else if (microAvg >= 55 && intraAvg >= 55) {
+                // Alineación alcista total
                 stratBadge.innerText = 'COMPRA CONFIRMADA';
                 stratBadge.style.backgroundColor = 'var(--green-bg)';
                 stratBadge.style.color = 'var(--green)';
                 stratText.innerText = `Alineación Alcista Total: Flujo alineado a favor de tendencia. Buscar entradas en retrocesos a soporte con mayor ratio R/R.`;
+
+                tradeTypeBadge.innerText = 'COMPRA EN CONTINUACIÓN (LONG)';
+                tradeTypeBadge.style.backgroundColor = 'var(--green-bg)';
+                tradeTypeBadge.style.color = 'var(--green)';
+
+                document.getElementById('wk-entry-val').innerText = `$${(p * 0.997).toFixed(1)}`;
+                document.getElementById('wk-sl-val').innerText = `$${(p * 0.990).toFixed(1)}`;
+                document.getElementById('wk-tp1-val').innerText = `$${(p * 1.015).toFixed(1)}`;
+                document.getElementById('wk-tp2-val').innerText = `$${(p * 1.035).toFixed(1)}`;
+
             } else if (microAvg <= 45 && intraAvg <= 45) {
+                // Alineación bajista total
                 stratBadge.innerText = 'VENTA CONFIRMADA';
                 stratBadge.style.backgroundColor = 'var(--red-bg)';
                 stratBadge.style.color = 'var(--red)';
                 stratText.innerText = `Alineación Bajista Total: Presión vendedora continua en todos los marcos. Priorizar ventas cortas (shorts) hacia mínimos.`;
+
+                tradeTypeBadge.innerText = 'VENTA EN CORTO (SHORT)';
+                tradeTypeBadge.style.backgroundColor = 'var(--red-bg)';
+                tradeTypeBadge.style.color = 'var(--red)';
+
+                document.getElementById('wk-entry-val').innerText = `$${(p * 1.003).toFixed(1)}`;
+                document.getElementById('wk-sl-val').innerText = `$${(p * 1.010).toFixed(1)}`;
+                document.getElementById('wk-tp1-val').innerText = `$${(p * 0.985).toFixed(1)}`;
+                document.getElementById('wk-tp2-val').innerText = `$${(p * 0.965).toFixed(1)}`;
+
             } else {
+                // Mercado neutral o mixto
                 stratBadge.innerText = 'ESPERAR CONFIRMACIÓN';
                 stratBadge.style.backgroundColor = 'rgba(240, 185, 11, 0.15)';
                 stratBadge.style.color = 'var(--yellow)';
                 stratText.innerText = `Direcciones mixtas en la matriz. Operar con cautela utilizando los niveles del gráfico o esperar alineación.`;
+
+                tradeTypeBadge.innerText = 'NEUTRAL / RANGO';
+                tradeTypeBadge.style.backgroundColor = 'rgba(240, 185, 11, 0.15)';
+                tradeTypeBadge.style.color = 'var(--yellow)';
+
+                document.getElementById('wk-entry-val').innerText = `$${(p * 0.995).toFixed(1)}`;
+                document.getElementById('wk-sl-val').innerText = `$${(p * 0.988).toFixed(1)}`;
+                document.getElementById('wk-tp1-val').innerText = `$${(p * 1.010).toFixed(1)}`;
+                document.getElementById('wk-tp2-val').innerText = `$${(p * 1.020).toFixed(1)}`;
             }
         }
 
