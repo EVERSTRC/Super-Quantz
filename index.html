@@ -91,7 +91,7 @@
         .broker-status-tag { font-size: 0.68rem; font-weight: 800; padding: 2px 6px; border-radius: 4px; }
         .tag-buy { background-color: var(--green-bg); color: var(--green); }
         .tag-sell { background-color: var(--red-bg); color: var(--red); }
-        .accum-val { font-size: 1rem; font-weight: 800; font-family: 'Roboto Mono', monospace; }
+        .accum-val { font-size: 0.95rem; font-weight: 800; font-family: 'Roboto Mono', monospace; }
 
         /* MOTOR IA Y DECISIÓN */
         .ai-overview { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; }
@@ -222,22 +222,22 @@
                     <div class="broker-accum-grid">
                         <div class="broker-card">
                             <div class="broker-card-header"><span class="broker-name">Binance</span><span class="broker-status-tag" id="binance-tag">--</span></div>
-                            <div class="accum-val" id="binance-val">50%</div>
+                            <div class="accum-val" id="binance-val">50% C / 50% V</div>
                             <div class="progress-bar-bg"><div class="progress-bar-fill" id="binance-bar"></div></div>
                         </div>
                         <div class="broker-card">
                             <div class="broker-card-header"><span class="broker-name">Bybit</span><span class="broker-status-tag" id="bybit-tag">--</span></div>
-                            <div class="accum-val" id="bybit-val">50%</div>
+                            <div class="accum-val" id="bybit-val">50% C / 50% V</div>
                             <div class="progress-bar-bg"><div class="progress-bar-fill" id="bybit-bar"></div></div>
                         </div>
                         <div class="broker-card">
                             <div class="broker-card-header"><span class="broker-name">Coinbase</span><span class="broker-status-tag" id="coinbase-tag">--</span></div>
-                            <div class="accum-val" id="coinbase-val">50%</div>
+                            <div class="accum-val" id="coinbase-val">50% C / 50% V</div>
                             <div class="progress-bar-bg"><div class="progress-bar-fill" id="coinbase-bar"></div></div>
                         </div>
                         <div class="broker-card">
                             <div class="broker-card-header"><span class="broker-name">OKX</span><span class="broker-status-tag" id="okx-tag">--</span></div>
-                            <div class="accum-val" id="okx-val">50%</div>
+                            <div class="accum-val" id="okx-val">50% C / 50% V</div>
                             <div class="progress-bar-bg"><div class="progress-bar-fill" id="okx-bar"></div></div>
                         </div>
                     </div>
@@ -326,10 +326,10 @@
 
     </main>
 
-    <!-- SECCIÓN ADICIONAL: ACUMULADO SEMANAL MATRIZ MULTI-BROKER POR TEMPORALIDAD EN PORCENTAJE -->
+    <!-- SECCIÓN ADICIONAL: ACUMULADO SEMANAL MATRIZ MULTI-BROKER POR TEMPORALIDAD EN PORCENTAJE (COMPRAS VS VENTAS) -->
     <section class="panel" style="max-width: 1600px; width: 100%; margin: 0 auto 20px auto;">
         <div class="panel-header">
-            <span class="panel-title">📅 Acumulado Semanal - Matriz Multi-Broker por Temporalidad (%)</span>
+            <span class="panel-title">📅 Acumulado Semanal - Matriz Multi-Broker por Temporalidad (% Compras / % Ventas)</span>
             <span id="weekly-info-tag" style="font-size: 0.75rem; color: var(--yellow); font-weight: bold;">Semana Activa</span>
         </div>
         <div class="panel-body">
@@ -338,15 +338,15 @@
                     <thead>
                         <tr>
                             <th>TF</th>
-                            <th>Binance % Semanal</th>
-                            <th>Bybit % Semanal</th>
-                            <th>Coinbase % Semanal</th>
-                            <th>OKX % Semanal</th>
-                            <th>Promedio TF (%)</th>
+                            <th>Binance Semanal</th>
+                            <th>Bybit Semanal</th>
+                            <th>Coinbase Semanal</th>
+                            <th>OKX Semanal</th>
+                            <th>Promedio Global TF</th>
                         </tr>
                     </thead>
                     <tbody id="weekly-matrix-tbody">
-                        <!-- Carga dinámicamente sin modificar la tabla superior -->
+                        <!-- Carga dinámicamente -->
                     </tbody>
                 </table>
             </div>
@@ -597,7 +597,10 @@
             const tagEl = document.getElementById(`${broker}-tag`);
             const barEl = document.getElementById(`${broker}-bar`);
 
-            valEl.innerText = `${val}%`;
+            const buyPct = val;
+            const sellPct = 100 - val;
+
+            valEl.innerText = `${buyPct}% C / ${sellPct}% V`;
             barEl.style.width = `${val}%`;
 
             if (val >= 50) {
@@ -689,7 +692,7 @@
         };
     </script>
 
-    <!-- MOTOR LÓGICO COMPLEMENTARIO PARA ACUMULADO SEMANAL MATRIZ MULTI-BROKER POR TEMPORALIDAD (%) -->
+    <!-- MOTOR LÓGICO COMPLEMENTARIO PARA ACUMULADO SEMANAL MATRIZ MULTI-BROKER POR TEMPORALIDAD CON DESGLOSE COMPRAS/VENTAS (%) -->
     <script>
         const weeklyAccumulator = {
             '1m':  { binance: [], bybit: [], coinbase: [], okx: [] },
@@ -751,6 +754,13 @@
             };
         }
 
+        function formatBuySell(buyPct) {
+            const b = buyPct.toFixed(1);
+            const s = (100 - buyPct).toFixed(1);
+            const cssClass = buyPct >= 50 ? 'cell-buy' : 'cell-sell';
+            return `<span class="${cssClass}">${b}% C / ${s}% V</span>`;
+        }
+
         function renderWeeklyMatrix() {
             const tbody = document.getElementById('weekly-matrix-tbody');
             if (!tbody) return;
@@ -766,16 +776,17 @@
                 const avgCb = calcAvg(data.coinbase);
                 const avgOk = calcAvg(data.okx);
                 
-                const tfTotalAvg = ((avgB + avgBy + avgCb + avgOk) / 4).toFixed(1);
+                const avgGlobalBuy = (avgB + avgBy + avgCb + avgOk) / 4;
+                const avgGlobalSell = 100 - avgGlobalBuy;
 
                 html += `
                     <tr>
                         <td style="font-weight:700;">${tf}</td>
-                        <td><span class="${avgB >= 50 ? 'cell-buy' : 'cell-sell'}">${avgB.toFixed(1)}%</span></td>
-                        <td><span class="${avgBy >= 50 ? 'cell-buy' : 'cell-sell'}">${avgBy.toFixed(1)}%</span></td>
-                        <td><span class="${avgCb >= 50 ? 'cell-buy' : 'cell-sell'}">${avgCb.toFixed(1)}%</span></td>
-                        <td><span class="${avgOk >= 50 ? 'cell-buy' : 'cell-sell'}">${avgOk.toFixed(1)}%</span></td>
-                        <td style="font-weight:800; color: var(--cyan);">${tfTotalAvg}%</td>
+                        <td>${formatBuySell(avgB)}</td>
+                        <td>${formatBuySell(avgBy)}</td>
+                        <td>${formatBuySell(avgCb)}</td>
+                        <td>${formatBuySell(avgOk)}</td>
+                        <td style="font-weight:800; color: var(--cyan);">${avgGlobalBuy.toFixed(1)}% C / ${avgGlobalSell.toFixed(1)}% V</td>
                     </tr>
                 `;
             }
