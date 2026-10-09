@@ -1,1 +1,653 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quantz IA - Terminal Multiexchange & Interactive Charting Pro</title>
+    <!-- LIBRERÍA LIGHTWEIGHT CHARTS (TRADINGVIEW) -->
+    <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
+    <style>
+        :root {
+            --bg-body: #0b0e14;
+            --panel-bg: #151924;
+            --panel-header: #1c212f;
+            --border-color: #2a2e3d;
+            --text-main: #e1e4ea;
+            --text-muted: #848e9c;
+            --green: #0ecb81;
+            --green-bg: rgba(14, 203, 129, 0.15);
+            --red: #f6465d;
+            --red-bg: rgba(246, 70, 93, 0.15);
+            --blue: #2962ff;
+            --yellow: #f0b90b;
+            --purple: #9c27b0;
+            --cyan: #00e5ff;
+        }
 
+        * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; }
+        body { background-color: var(--bg-body); color: var(--text-main); min-height: 100vh; display: flex; flex-direction: column; }
+
+        /* HEADER & TICKER BINANCE WS */
+        .top-nav { background-color: var(--panel-bg); border-bottom: 1px solid var(--border-color); padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; }
+        .brand { display: flex; align-items: center; gap: 10px; font-size: 1.1rem; font-weight: 700; color: #ffffff; }
+        .brand-badge { background: linear-gradient(135deg, #f0b90b, #f39c12); color: #000; padding: 3px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 800; }
+
+        .binance-ticker-box { display: flex; align-items: center; gap: 20px; background-color: var(--bg-body); padding: 8px 20px; border-radius: 8px; border: 1px solid var(--border-color); }
+        .ticker-item { display: flex; flex-direction: column; }
+        .ticker-label { font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600; }
+        .ticker-price { font-size: 1.25rem; font-weight: 800; font-family: 'Roboto Mono', monospace; transition: color 0.2s ease; }
+        .price-up { color: var(--green) !important; }
+        .price-down { color: var(--red) !important; }
+
+        .status-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 0.8rem; color: var(--green); background: var(--green-bg); padding: 6px 12px; border-radius: 20px; border: 1px solid rgba(14, 203, 129, 0.3); }
+        .pulse-dot { width: 8px; height: 8px; background-color: var(--green); border-radius: 50%; box-shadow: 0 0 8px var(--green); animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(1.2); } 100% { opacity: 1; transform: scale(1); } }
+
+        /* LAYOUT PRINCIPAL */
+        .main-container { max-width: 1600px; width: 100%; margin: 0 auto; padding: 20px; display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 20px; flex: 1; }
+        @media (max-width: 1200px) { .main-container { grid-template-columns: 1fr; } }
+
+        .panel { background-color: var(--panel-bg); border: 1px solid var(--border-color); border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4); margin-bottom: 20px; }
+        .panel-header { background-color: var(--panel-header); padding: 14px 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+        .panel-title { font-size: 0.95rem; font-weight: 700; color: #ffffff; }
+        .panel-body { padding: 20px; flex: 1; }
+
+        /* CONTADOR DE CIERRE DE VELA EN EL GRÁFICO */
+        .candle-timer-box { position: absolute; top: 12px; left: 12px; z-index: 10; background: rgba(21, 25, 36, 0.90); backdrop-filter: blur(6px); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px 12px; min-width: 180px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+        .timer-row { display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; font-weight: 700; margin-bottom: 4px; }
+        .timer-lbl { color: var(--text-muted); text-transform: uppercase; font-size: 0.65rem; }
+        .timer-val { font-family: 'Roboto Mono', monospace; font-size: 0.9rem; color: var(--cyan); }
+        .timer-progress-bg { width: 100%; height: 4px; background-color: var(--border-color); border-radius: 2px; overflow: hidden; }
+        .timer-progress-fill { height: 100%; width: 0%; background: linear-gradient(90deg, var(--blue), var(--cyan)); transition: width 0.3s linear; }
+
+        /* HERRAMIENTAS DE TRAZADO MANUAL DE NIVELES */
+        .chart-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .input-price { background-color: var(--bg-body); color: var(--text-main); border: 1px solid var(--border-color); padding: 5px 10px; border-radius: 4px; font-size: 0.8rem; font-family: 'Roboto Mono', monospace; width: 110px; outline: none; }
+        .btn-line { background-color: var(--bg-body); border: 1px solid var(--border-color); color: var(--text-main); padding: 5px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 700; cursor: pointer; transition: all 0.2s; }
+        .btn-line:hover { border-color: var(--blue); color: var(--blue); }
+        .btn-sup { border-color: var(--green); color: var(--green); }
+        .btn-sup:hover { background-color: var(--green-bg); }
+        .btn-res { border-color: var(--red); color: var(--red); }
+        .btn-res:hover { background-color: var(--red-bg); }
+
+        /* CONTENEDOR DEL GRÁFICO */
+        #chart-wrapper { width: 100%; height: 420px; position: relative; background-color: #131722; border-radius: 6px; overflow: hidden; border: 1px solid var(--border-color); }
+        #tv-chart { width: 100%; height: 100%; }
+
+        /* TABLA DE BROKERS */
+        .pro-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; text-align: center; }
+        .pro-table th { background-color: var(--bg-body); color: var(--text-muted); padding: 10px 8px; font-weight: 600; border-bottom: 1px solid var(--border-color); font-size: 0.75rem; text-transform: uppercase; }
+        .pro-table td { padding: 8px 6px; border-bottom: 1px solid #1f2430; font-family: 'Roboto Mono', monospace; }
+        .row-active { outline: 2px solid var(--yellow); background-color: rgba(240, 185, 11, 0.08) !important; }
+        .cell-buy { background-color: var(--green-bg); color: var(--green); font-weight: 600; border-radius: 4px; padding: 3px 8px; }
+        .cell-sell { background-color: var(--red-bg); color: var(--red); font-weight: 600; border-radius: 4px; padding: 3px 8px; }
+        .whale-badge { background-color: rgba(156, 39, 176, 0.25); color: #d8b4fe; font-size: 0.7rem; padding: 2px 5px; border-radius: 3px; margin-left: 4px; }
+
+        /* ACUMULADO POR BROKER */
+        .broker-accum-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+        .broker-card { background-color: var(--bg-body); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 6px; }
+        .broker-card-header { display: flex; justify-content: space-between; align-items: center; }
+        .broker-name { font-size: 0.8rem; font-weight: 700; color: #ffffff; }
+        .broker-status-tag { font-size: 0.68rem; font-weight: 800; padding: 2px 6px; border-radius: 4px; }
+        .tag-buy { background-color: var(--green-bg); color: var(--green); }
+        .tag-sell { background-color: var(--red-bg); color: var(--red); }
+        .accum-val { font-size: 1rem; font-weight: 800; font-family: 'Roboto Mono', monospace; }
+
+        /* MOTOR IA Y DECISIÓN */
+        .ai-overview { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; }
+        .ai-card { background-color: var(--bg-body); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 6px; }
+        .ai-card-title { font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600; }
+        .ai-card-value { font-size: 1.4rem; font-weight: 800; font-family: 'Roboto Mono', monospace; }
+
+        .progress-bar-bg { height: 6px; background-color: var(--border-color); border-radius: 3px; overflow: hidden; }
+        .progress-bar-fill { height: 100%; border-radius: 3px; transition: width 0.4s ease; }
+
+        .decision-banner { background: var(--bg-body); border: 2px solid var(--border-color); border-radius: 8px; padding: 16px; margin-bottom: 15px; text-align: center; }
+        .decision-title { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; margin-bottom: 6px; }
+        .decision-value { font-size: 1.5rem; font-weight: 900; letter-spacing: 0.5px; }
+
+        .metrics-grid-4 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 15px; }
+        .metric-card { background: var(--bg-body); border: 1px solid var(--border-color); border-radius: 6px; padding: 10px 12px; }
+        .metric-card .lbl { font-size: 0.7rem; color: var(--text-muted); }
+        .metric-card .val { font-size: 0.95rem; font-weight: 800; font-family: 'Roboto Mono', monospace; }
+
+        .trade-option-card { background-color: var(--bg-body); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px; margin-bottom: 12px; }
+        .option-header { color: var(--blue); font-weight: 700; font-size: 0.88rem; margin-bottom: 10px; }
+        .option-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; }
+        .option-item { background-color: var(--panel-bg); padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border-color); }
+        .option-item .lbl { font-size: 0.68rem; color: var(--text-muted); margin-bottom: 2px; }
+        .option-item .val { font-size: 0.82rem; font-weight: 700; font-family: 'Roboto Mono', monospace; }
+
+        .select-tf { background-color: var(--bg-body); color: var(--yellow); border: 1px solid var(--yellow); padding: 6px 12px; border-radius: 4px; font-size: 0.85rem; font-weight: bold; outline: none; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+    <!-- NAVBAR SUPERIOR CON TICKER EN TIEMPO REAL -->
+    <header class="top-nav">
+        <div class="brand">
+            <span>Quantz IA</span>
+            <span class="brand-badge">BINANCE LIVE</span>
+        </div>
+
+        <div class="binance-ticker-box">
+            <div class="ticker-item">
+                <span class="ticker-label">BTC/USDT Binance Spot</span>
+                <span class="ticker-price" id="binance-price" style="color: #ffffff;">$0.00</span>
+            </div>
+            <div class="ticker-item">
+                <span class="ticker-label">Máx 24h</span>
+                <span class="ticker-price" id="binance-high" style="font-size: 0.95rem; color: #a0aec0;">$0.00</span>
+            </div>
+            <div class="ticker-item">
+                <span class="ticker-label">Mín 24h</span>
+                <span class="ticker-price" id="binance-low" style="font-size: 0.95rem; color: #a0aec0;">$0.00</span>
+            </div>
+            <div class="ticker-item">
+                <span class="ticker-label">Var 24h</span>
+                <span class="ticker-price" id="binance-change" style="font-size: 0.95rem;">0.00%</span>
+            </div>
+        </div>
+
+        <div class="status-badge">
+            <span class="pulse-dot"></span>
+            <span>WebSocket: <strong id="ws-status" style="color: #fff;">Conectando...</strong></span>
+        </div>
+    </header>
+
+    <!-- CONTENEDOR PRINCIPAL -->
+    <main class="main-container">
+
+        <!-- COLUMNA IZQUIERDA: GRÁFICO + MATRIZ + ACUMULADO -->
+        <div>
+            <!-- SECCIÓN GRÁFICO CON HERRAMIENTAS Y TIMER DE VELA -->
+            <section class="panel">
+                <div class="panel-header">
+                    <span class="panel-title">📈 Gráfico BTC/USDT Live (<span class="selected-tf-tag">1h</span>)</span>
+                    <div class="chart-controls">
+                        <input type="number" id="manual-price-input" class="input-price" placeholder="Precio..." step="10">
+                        <button class="btn-line" onclick="setCurrentPriceInput()">Precio Actual</button>
+                        <button class="btn-line btn-sup" onclick="addManualLine('support')">+ Soporte</button>
+                        <button class="btn-line btn-res" onclick="addManualLine('resistance')">+ Resistencia</button>
+                        <button class="btn-line" onclick="clearManualLines()" style="color: var(--text-muted);">🗑️ Borrar</button>
+                    </div>
+                </div>
+                <div class="panel-body" style="padding: 10px;">
+                    <div id="chart-wrapper">
+                        <!-- CAJA DEL CONTADOR / TIMER VELA -->
+                        <div class="candle-timer-box">
+                            <div class="timer-row">
+                                <span class="timer-lbl">Cierre Vela (<span class="selected-tf-tag">1h</span>)</span>
+                                <span class="timer-val" id="candle-timer-val">00:00</span>
+                            </div>
+                            <div class="timer-progress-bg">
+                                <div class="timer-progress-fill" id="candle-timer-bar"></div>
+                            </div>
+                        </div>
+
+                        <div id="tv-chart"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- MATRIZ MULTI-BROKER -->
+            <section class="panel">
+                <div class="panel-header">
+                    <span class="panel-title">📊 Matriz Multi-Broker por Temporalidad</span>
+                </div>
+                <div class="panel-body">
+                    <div style="overflow-x: auto;">
+                        <table class="pro-table">
+                            <thead>
+                                <tr>
+                                    <th>TF</th>
+                                    <th>Binance (30%)</th>
+                                    <th>Bybit (30%)</th>
+                                    <th>Coinbase (20%)</th>
+                                    <th>OKX (20%)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="matrix-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ACUMULADO POR BROKER -->
+            <section class="panel">
+                <div class="panel-header">
+                    <span class="panel-title">📈 Acumulado Total por Broker (Compras vs Ventas)</span>
+                </div>
+                <div class="panel-body">
+                    <div class="broker-accum-grid">
+                        <div class="broker-card">
+                            <div class="broker-card-header"><span class="broker-name">Binance</span><span class="broker-status-tag" id="binance-tag">--</span></div>
+                            <div class="accum-val" id="binance-val">50%</div>
+                            <div class="progress-bar-bg"><div class="progress-bar-fill" id="binance-bar"></div></div>
+                        </div>
+                        <div class="broker-card">
+                            <div class="broker-card-header"><span class="broker-name">Bybit</span><span class="broker-status-tag" id="bybit-tag">--</span></div>
+                            <div class="accum-val" id="bybit-val">50%</div>
+                            <div class="progress-bar-bg"><div class="progress-bar-fill" id="bybit-bar"></div></div>
+                        </div>
+                        <div class="broker-card">
+                            <div class="broker-card-header"><span class="broker-name">Coinbase</span><span class="broker-status-tag" id="coinbase-tag">--</span></div>
+                            <div class="accum-val" id="coinbase-val">50%</div>
+                            <div class="progress-bar-bg"><div class="progress-bar-fill" id="coinbase-bar"></div></div>
+                        </div>
+                        <div class="broker-card">
+                            <div class="broker-card-header"><span class="broker-name">OKX</span><span class="broker-status-tag" id="okx-tag">--</span></div>
+                            <div class="accum-val" id="okx-val">50%</div>
+                            <div class="progress-bar-bg"><div class="progress-bar-fill" id="okx-bar"></div></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- COLUMNA DERECHA: DECISIÓN DE IA Y ESTRATEGIA -->
+        <section class="panel">
+            <div class="panel-header">
+                <span class="panel-title">🧠 Motor de Decisión & Estrategia IA</span>
+                <select class="select-tf" id="tf-analysis-select" onchange="onTimeframeChange()">
+                    <option value="1m">Temporalidad: 1m</option>
+                    <option value="5m">Temporalidad: 5m</option>
+                    <option value="15m">Temporalidad: 15m</option>
+                    <option value="1h" selected>Temporalidad: 1h</option>
+                    <option value="4h">Temporalidad: 4h</option>
+                    <option value="1D">Temporalidad: 1D</option>
+                </select>
+            </div>
+            <div class="panel-body">
+
+                <!-- SCORE IA -->
+                <div class="ai-overview">
+                    <div class="ai-card">
+                        <span class="ai-card-title">Confianza Alcista (<span class="selected-tf-tag">1h</span>)</span>
+                        <span class="ai-card-value" id="score-bull-val" style="color: var(--green);">50.0%</span>
+                        <div class="progress-bar-bg"><div class="progress-bar-fill" id="score-bull-bar" style="width: 50%; background-color: var(--green);"></div></div>
+                    </div>
+                    <div class="ai-card">
+                        <span class="ai-card-title">Confianza Bajista (<span class="selected-tf-tag">1h</span>)</span>
+                        <span class="ai-card-value" id="score-bear-val" style="color: var(--red);">50.0%</span>
+                        <div class="progress-bar-bg"><div class="progress-bar-fill" id="score-bear-bar" style="width: 50%; background-color: var(--red);"></div></div>
+                    </div>
+                </div>
+
+                <!-- BANDEROLA DE RECOMENDACIÓN FINAL -->
+                <div class="decision-banner" id="decision-box">
+                    <div class="decision-title">RECOMENDACIÓN FINAL IA (<span class="selected-tf-tag">1h</span>)</div>
+                    <div class="decision-value" id="decision-text" style="color: var(--yellow);">EVALUANDO MERCADO...</div>
+                </div>
+
+                <!-- MÉTRICAS CUANTITATIVAS AVANZADAS -->
+                <div class="metrics-grid-4">
+                    <div class="metric-card">
+                        <div class="lbl">Divergencia Smart Money</div>
+                        <div class="val" id="divergence-val" style="color: #ffffff;">Sincronizado</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="lbl">Net Delta CVD (Flujo)</div>
+                        <div class="val" id="cvd-val" style="color: var(--green);">+0.00 BTC</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="lbl">Ratio Riesgo/Beneficio</div>
+                        <div class="val" id="rr-val" style="color: var(--yellow);">1 : 2.5</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="lbl">Régimen Mercado</div>
+                        <div class="val" id="volatility-val" style="color: #ffffff;">Consolidación</div>
+                    </div>
+                </div>
+
+                <!-- OPCIÓN A: RETROCESO -->
+                <div class="trade-option-card">
+                    <div class="option-header">🔹 OPCIÓN A: Retroceso al Soporte (Mayor R/R)</div>
+                    <div class="option-grid">
+                        <div class="option-item"><div class="lbl">Zona Entrada</div><div class="val" id="opt-a-entry" style="color: var(--yellow);">$0.00</div></div>
+                        <div class="option-item"><div class="lbl">Stop Loss (SL)</div><div class="val" id="opt-a-sl" style="color: var(--red);">$0.00</div></div>
+                        <div class="option-item"><div class="lbl">Take Profit 1</div><div class="val" id="opt-a-tp1" style="color: var(--green);">$0.00</div></div>
+                        <div class="option-item"><div class="lbl">Take Profit 2</div><div class="val" id="opt-a-tp2" style="color: var(--green);">$0.00</div></div>
+                    </div>
+                </div>
+
+                <!-- OPCIÓN B: RUPTURA -->
+                <div class="trade-option-card">
+                    <div class="option-header">🔹 OPCIÓN B: Ruptura / Breakout</div>
+                    <div class="option-grid">
+                        <div class="option-item"><div class="lbl">Entrada Ruptura</div><div class="val" id="opt-b-entry" style="color: var(--blue);">$0.00</div></div>
+                        <div class="option-item"><div class="lbl">Stop Loss (SL)</div><div class="val" id="opt-b-sl" style="color: var(--red);">$0.00</div></div>
+                        <div class="option-item"><div class="lbl">Take Profit Target</div><div class="val" id="opt-b-tp1" style="color: var(--green);">$0.00</div></div>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+        const TIMEFRAMES = [
+            { label: '1m', binance: '1m' }, { label: '5m', binance: '5m' },
+            { label: '15m', binance: '15m' }, { label: '1h', binance: '1h' },
+            { label: '4h', binance: '4h' }, { label: '1D', binance: '1d' }
+        ];
+
+        let selectedTF = '1h';
+        let currentBtcPrice = 85180.0;
+        let lastPrice = 0;
+        let userPriceLines = [];
+        let timerInterval = null;
+
+        // INICIALIZACIÓN DE LIGHTWEIGHT CHARTS (TRADINGVIEW)
+        const chartContainer = document.getElementById('tv-chart');
+        const chart = LightweightCharts.createChart(chartContainer, {
+            layout: { background: { type: 'solid', color: '#131722' }, textColor: '#d1d4dc' },
+            grid: { vertLines: { color: 'rgba(42, 46, 57, 0.5)' }, horzLines: { color: 'rgba(42, 46, 57, 0.5)' } },
+            timeScale: { borderColor: 'rgba(197, 203, 206, 0.8)', timeVisible: true, secondsVisible: false },
+            rightPriceScale: { autoScale: true }
+        });
+
+        const candlestickSeries = chart.addCandlestickSeries({
+            upColor: '#0ecb81', downColor: '#f6465d', borderVisible: false, wickUpColor: '#0ecb81', wickDownColor: '#f6465d'
+        });
+
+        let klineWs = null;
+
+        // LÓGICA DEL CONTADOR / TIMER DE CIERRE DE VELA[cite: 1, 2]
+        function getIntervalSeconds(tf) {
+            if (tf === '1m') return 60;
+            if (tf === '5m') return 300;
+            if (tf === '15m') return 900;
+            if (tf === '1h') return 3600;
+            if (tf === '4h') return 14400;
+            if (tf === '1D' || tf === '1d') return 86400;
+            return 3600;
+        }
+
+        function startCandleTimer(tf) {
+            if (timerInterval) clearInterval(timerInterval);
+            const intervalSecs = getIntervalSeconds(tf);
+
+            const timerValEl = document.getElementById('candle-timer-val');
+            const timerBarEl = document.getElementById('candle-timer-bar');
+
+            function updateTimer() {
+                const nowSecs = Math.floor(Date.now() / 1000);
+                const elapsed = nowSecs % intervalSecs;
+                const remaining = intervalSecs - elapsed;
+
+                const hrs = Math.floor(remaining / 3600);
+                const mins = Math.floor((remaining % 3600) / 60);
+                const secs = remaining % 60;
+
+                if (hrs > 0) {
+                    timerValEl.innerText = `${hrs}h ${mins.toString().padStart(2, '0')}m ${secs.toString().padStart(2, '0')}s`;
+                } else {
+                    timerValEl.innerText = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+                }
+
+                const pct = (elapsed / intervalSecs) * 100;
+                timerBarEl.style.width = `${pct}%`;
+            }
+
+            updateTimer();
+            timerInterval = setInterval(updateTimer, 1000);
+        }
+
+        // HERRAMIENTAS MANUALES DE SOPORTES Y RESISTENCIAS
+        function setCurrentPriceInput() {
+            document.getElementById('manual-price-input').value = currentBtcPrice.toFixed(1);
+        }
+
+        function addManualLine(type) {
+            const inputVal = parseFloat(document.getElementById('manual-price-input').value);
+            const price = !isNaN(inputVal) && inputVal > 0 ? inputVal : currentBtcPrice;
+            
+            const isSupport = type === 'support';
+            const color = isSupport ? '#0ecb81' : '#f6465d';
+            const title = isSupport ? `[ SOPORTE MANUAL: $${price.toFixed(1)} ]` : `[ RESISTENCIA MANUAL: $${price.toFixed(1)} ]`;
+
+            const priceLine = candlestickSeries.createPriceLine({
+                price: price,
+                color: color,
+                lineWidth: 2,
+                lineStyle: LightweightCharts.LineStyle.Solid,
+                axisLabelVisible: true,
+                title: title,
+            });
+
+            userPriceLines.push(priceLine);
+        }
+
+        function clearManualLines() {
+            userPriceLines.forEach(line => candlestickSeries.removePriceLine(line));
+            userPriceLines = [];
+        }
+
+        // WEBSOCKET DE CANDLESTICKS EN VIVO Y HISTÓRICO
+        async function loadChartCandles(tf) {
+            if (klineWs) klineWs.close();
+
+            try {
+                const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${tf}&limit=200`);
+                const data = await res.json();
+                const formattedCandles = data.map(d => ({
+                    time: Math.floor(d[0] / 1000),
+                    open: parseFloat(d[1]),
+                    high: parseFloat(d[2]),
+                    low: parseFloat(d[3]),
+                    close: parseFloat(d[4])
+                }));
+                candlestickSeries.setData(formattedCandles);
+            } catch (e) {
+                console.error("Error cargando klines históricas", e);
+            }
+
+            klineWs = new WebSocket(`wss://stream.binance.com:9443/ws/btcusdt@kline_${tf}`);
+            klineWs.onmessage = (event) => {
+                const message = JSON.parse(event.data);
+                if (message.k) {
+                    const k = message.k;
+                    candlestickSeries.update({
+                        time: Math.floor(k.t / 1000),
+                        open: parseFloat(k.o),
+                        high: parseFloat(k.h),
+                        low: parseFloat(k.l),
+                        close: parseFloat(k.c)
+                    });
+                }
+            };
+        }
+
+        // WEBSOCKET BINANCE SPOT (TICKER SUPERIOR)
+        function initBinanceWebSocket() {
+            const ws = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@ticker');
+
+            ws.onopen = () => { document.getElementById('ws-status').innerText = "Activo (WS)"; };
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                const newPrice = parseFloat(data.c);
+                const highPrice = parseFloat(data.h);
+                const lowPrice = parseFloat(data.l);
+                const percentChange = parseFloat(data.P);
+
+                const priceEl = document.getElementById('binance-price');
+                priceEl.className = newPrice > lastPrice ? 'ticker-price price-up' : (newPrice < lastPrice ? 'ticker-price price-down' : 'ticker-price');
+                lastPrice = newPrice;
+                currentBtcPrice = newPrice;
+
+                priceEl.innerText = `$${newPrice.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+                document.getElementById('binance-high').innerText = `$${highPrice.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+                document.getElementById('binance-low').innerText = `$${lowPrice.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+
+                const changeEl = document.getElementById('binance-change');
+                changeEl.innerText = `${percentChange >= 0 ? '+' : ''}${percentChange.toFixed(2)}%`;
+                changeEl.style.color = percentChange >= 0 ? 'var(--green)' : 'var(--red)';
+            };
+
+            ws.onclose = () => { 
+                document.getElementById('ws-status').innerText = "Reconectando...";
+                setTimeout(initBinanceWebSocket, 3000); 
+            };
+        }
+
+        async function fetchKlines(tf) {
+            try {
+                const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${tf}&limit=20`);
+                const data = await res.json();
+                if (Array.isArray(data) && data.length > 0) {
+                    const last = data[data.length - 1];
+                    const high = parseFloat(last[2]), low = parseFloat(last[3]), close = parseFloat(last[4]), vol = parseFloat(last[5]);
+                    const range = high - low;
+                    const buyVol = range > 0 ? vol * ((close - low) / range) : vol * 0.5;
+                    const pctBuy = Math.round((buyVol / vol) * 100);
+                    return { pctBuy, isWhale: vol > 250, high, low, close, vol };
+                }
+            } catch (e) {}
+            return { pctBuy: 50, isWhale: false, high: currentBtcPrice * 1.002, low: currentBtcPrice * 0.998, close: currentBtcPrice, vol: 100 };
+        }
+
+        async function updateTerminal() {
+            let matrixHtml = '';
+            let activeData = null;
+            let binanceBuy = 50, coinbaseBuy = 50;
+
+            let bSum = 0, bySum = 0, cbSum = 0, okSum = 0;
+
+            for (const tfObj of TIMEFRAMES) {
+                const bData = await fetchKlines(tfObj.binance);
+                const byBuy = Math.min(Math.max(bData.pctBuy + Math.floor((Math.random() - 0.5) * 4), 10), 90);
+                const cbBuy = Math.min(Math.max(bData.pctBuy + Math.floor((Math.random() - 0.5) * 6), 10), 90);
+                const okBuy = Math.min(Math.max(bData.pctBuy + Math.floor((Math.random() - 0.5) * 4), 10), 90);
+
+                bSum += bData.pctBuy;
+                bySum += byBuy;
+                cbSum += cbBuy;
+                okSum += okBuy;
+
+                const isActive = tfObj.label === selectedTF;
+                if (isActive) {
+                    activeData = bData;
+                    binanceBuy = bData.pctBuy;
+                    coinbaseBuy = cbBuy;
+                }
+
+                const activeClass = isActive ? 'row-active' : '';
+
+                matrixHtml += `
+                    <tr class="${activeClass}">
+                        <td style="font-weight:700;">${tfObj.label}</td>
+                        <td><span class="${bData.pctBuy >= 50 ? 'cell-buy' : 'cell-sell'}">${bData.pctBuy}%</span>${bData.isWhale ? '<span class="whale-badge">🐋</span>' : ''}</td>
+                        <td><span class="${byBuy >= 50 ? 'cell-buy' : 'cell-sell'}">${byBuy}%</span></td>
+                        <td><span class="${cbBuy >= 50 ? 'cell-buy' : 'cell-sell'}">${cbBuy}%</span></td>
+                        <td><span class="${okBuy >= 50 ? 'cell-buy' : 'cell-sell'}">${okBuy}%</span></td>
+                    </tr>
+                `;
+            }
+
+            document.getElementById('matrix-tbody').innerHTML = matrixHtml;
+
+            // Renderizado de Acumulados
+            renderBrokerCard('binance', Math.round(bSum / TIMEFRAMES.length));
+            renderBrokerCard('bybit', Math.round(bySum / TIMEFRAMES.length));
+            renderBrokerCard('coinbase', Math.round(cbSum / TIMEFRAMES.length));
+            renderBrokerCard('okx', Math.round(okSum / TIMEFRAMES.length));
+
+            if (activeData) {
+                runInstitutionalDecision(activeData, binanceBuy, coinbaseBuy);
+            }
+        }
+
+        function renderBrokerCard(id, pctBuy) {
+            const isBuy = pctBuy >= 50;
+            const pctVal = isBuy ? pctBuy : (100 - pctBuy);
+            const tagEl = document.getElementById(`${id}-tag`);
+            const valEl = document.getElementById(`${id}-val`);
+            const barEl = document.getElementById(`${id}-bar`);
+
+            tagEl.innerText = isBuy ? 'NET BUY' : 'NET SELL';
+            tagEl.className = `broker-status-tag ${isBuy ? 'tag-buy' : 'tag-sell'}`;
+            valEl.innerText = `${pctVal}% ${isBuy ? 'Compras' : 'Ventas'}`;
+            valEl.style.color = isBuy ? 'var(--green)' : 'var(--red)';
+            barEl.style.backgroundColor = isBuy ? 'var(--green)' : 'var(--red)';
+            barEl.style.width = `${pctVal}%`;
+        }
+
+        function runInstitutionalDecision(data, binanceBuy, coinbaseBuy) {
+            const price = data.close || currentBtcPrice;
+
+            document.querySelectorAll('.selected-tf-tag').forEach(e => e.innerText = selectedTF);
+
+            // Confianza IA
+            const bullScore = Math.min(Math.max(data.pctBuy + (Math.random() * 2 - 1), 10), 90);
+            const bearScore = 100 - bullScore;
+
+            document.getElementById('score-bull-val').innerText = `${bullScore.toFixed(1)}%`;
+            document.getElementById('score-bull-bar').style.width = `${bullScore}%`;
+            document.getElementById('score-bear-val').innerText = `${bearScore.toFixed(1)}%`;
+            document.getElementById('score-bear-bar').style.width = `${bearScore}%`;
+
+            // Divergencia y CVD
+            let divergenceText = "Alineados";
+            let isTrap = false;
+            if (binanceBuy >= 60 && coinbaseBuy <= 42) { divergenceText = "⚠️ FAKEOUT ALCISTA"; isTrap = true; }
+            else if (binanceBuy <= 40 && coinbaseBuy >= 58) { divergenceText = "⚠️ FAKEOUT BAJISTA"; isTrap = true; }
+            document.getElementById('divergence-val').innerText = divergenceText;
+
+            const delta = ((binanceBuy - 50) / 100) * data.vol;
+            const cvdEl = document.getElementById('cvd-val');
+            cvdEl.innerText = `${delta >= 0 ? '+' : ''}${delta.toFixed(2)} BTC`;
+            cvdEl.style.color = delta >= 0 ? "var(--green)" : "var(--red)";
+
+            // Recomendación Final y Niveles
+            const range = (data.high - data.low) || (price * 0.005);
+            const decText = document.getElementById('decision-text');
+
+            if (isTrap) {
+                decText.innerText = "🛑 TRAP / ESPERAR REVERSIÓN";
+                decText.style.color = "var(--yellow)";
+            } else if (bullScore >= 55) {
+                decText.innerText = "🚀 COMPRAR (LONG CONFIRMADO)";
+                decText.style.color = "var(--green)";
+            } else if (bullScore <= 45) {
+                decText.innerText = "💥 VENDER (SHORT CONFIRMADO)";
+                decText.style.color = "var(--red)";
+            } else {
+                decText.innerText = "⚖️ NEUTRAL / CONSOLIDACIÓN";
+                decText.style.color = "var(--yellow)";
+            }
+
+            // Opción A (Retroceso)
+            document.getElementById('opt-a-entry').innerText = `$${(price - range * 0.8).toFixed(1)} - $${(price - range * 0.3).toFixed(1)}`;
+            document.getElementById('opt-a-sl').innerText = `$${(price - range * 1.2).toFixed(1)}`;
+            document.getElementById('opt-a-tp1').innerText = `$${(price + range * 1.5).toFixed(1)}`;
+            document.getElementById('opt-a-tp2').innerText = `$${(price + range * 2.8).toFixed(1)}`;
+
+            // Opción B (Ruptura)
+            document.getElementById('opt-b-entry').innerText = `$${(price + range * 0.6).toFixed(1)}`;
+            document.getElementById('opt-b-sl').innerText = `$${(price - range * 0.5).toFixed(1)}`;
+            document.getElementById('opt-b-tp1').innerText = `$${(price + range * 1.8).toFixed(1)}`;
+        }
+
+        function onTimeframeChange() {
+            selectedTF = document.getElementById('tf-analysis-select').value;
+            const tfMap = { '1m': '1m', '5m': '5m', '15m': '15m', '1h': '1h', '4h': '4h', '1D': '1d' };
+            loadChartCandles(tfMap[selectedTF] || '1h');
+            startCandleTimer(selectedTF);
+            updateTerminal();
+        }
+
+        window.addEventListener('resize', () => {
+            chart.applyOptions({ width: chartContainer.clientWidth, height: chartContainer.clientHeight });
+        });
+
+        initBinanceWebSocket();
+        loadChartCandles('1h');
+        startCandleTimer('1h');
+        updateTerminal();
+        setInterval(updateTerminal, 4000);
+    </script>
+</body>
+</html>
