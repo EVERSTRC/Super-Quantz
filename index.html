@@ -119,6 +119,15 @@
         .option-item .val { font-size: 0.82rem; font-weight: 700; font-family: 'Roboto Mono', monospace; }
 
         .select-tf { background-color: var(--bg-body); color: var(--yellow); border: 1px solid var(--yellow); padding: 6px 12px; border-radius: 4px; font-size: 0.85rem; font-weight: bold; outline: none; cursor: pointer; }
+
+        /* ESTILOS PARA EL ANÁLISIS DENTRO DEL ACUMULADO SEMANAL */
+        .weekly-analysis-container { margin-top: 15px; padding-top: 15px; border-top: 1px dashed var(--border-color); }
+        .weekly-analysis-header { font-size: 0.85rem; font-weight: 700; color: var(--cyan); margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+        .weekly-analysis-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+        .analysis-card { background-color: var(--bg-body); border: 1px solid var(--border-color); border-radius: 6px; padding: 12px; }
+        .analysis-title { font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; margin-bottom: 6px; display: flex; justify-content: space-between; }
+        .analysis-text { font-size: 0.8rem; line-height: 1.4; color: var(--text-main); }
+        .analysis-badge { padding: 2px 6px; border-radius: 3px; font-size: 0.68rem; font-weight: 800; }
     </style>
 </head>
 <body>
@@ -326,7 +335,7 @@
 
     </main>
 
-    <!-- SECCIÓN ADICIONAL: ACUMULADO SEMANAL MATRIZ MULTI-BROKER POR TEMPORALIDAD EN PORCENTAJE (COMPRAS VS VENTAS) -->
+    <!-- SECCIÓN ADICIONAL: ACUMULADO SEMANAL MATRIZ MULTI-BROKER CON ANÁLISIS DE DECISIÓN -->
     <section class="panel" style="max-width: 1600px; width: 100%; margin: 0 auto 20px auto;">
         <div class="panel-header">
             <span class="panel-title">📅 Acumulado Semanal - Matriz Multi-Broker por Temporalidad (% Compras / % Ventas)</span>
@@ -350,6 +359,37 @@
                     </tbody>
                 </table>
             </div>
+
+            <!-- ANÁLISIS Y DIAGNÓSTICO INTEGRADO PARA LA SECCIÓN SEMANAL -->
+            <div class="weekly-analysis-container">
+                <div class="weekly-analysis-header">
+                    <span>🧠 Diagnóstico Cuantitativo & Toma de Decisiones Semanal</span>
+                </div>
+                <div class="weekly-analysis-grid">
+                    <div class="analysis-card">
+                        <div class="analysis-title">
+                            <span>Micro Flujo (1m - 15m)</span>
+                            <span class="analysis-badge" id="wk-micro-badge" style="background-color: var(--green-bg); color: var(--green);">ALCISTA</span>
+                        </div>
+                        <div class="analysis-text" id="wk-micro-text">Evaluando acumulado...</div>
+                    </div>
+                    <div class="analysis-card">
+                        <div class="analysis-title">
+                            <span>Estructura Intradía (1h - 4h)</span>
+                            <span class="analysis-badge" id="wk-intra-badge" style="background-color: var(--red-bg); color: var(--red);">BAJISTA</span>
+                        </div>
+                        <div class="analysis-text" id="wk-intra-text">Evaluando acumulado...</div>
+                    </div>
+                    <div class="analysis-card">
+                        <div class="analysis-title">
+                            <span>Sesgo Semanal & Estrategia</span>
+                            <span class="analysis-badge" id="wk-strategy-badge" style="background-color: rgba(240, 185, 11, 0.15); color: var(--yellow);">ESPERA</span>
+                        </div>
+                        <div class="analysis-text" id="wk-strategy-text">Evaluando acumulado...</div>
+                    </div>
+                </div>
+            </div>
+
         </div>
     </section>
 
@@ -692,7 +732,7 @@
         };
     </script>
 
-    <!-- MOTOR LÓGICO COMPLEMENTARIO CON PERSISTENCIA (LOCALSTORAGE) Y DESGLOSE COMPRAS/VENTAS (%) -->
+    <!-- MOTOR LÓGICO COMPLEMENTARIO CON ANÁLISIS AUTOMÁTICO EN LA SECCIÓN SEMANAL -->
     <script>
         let weeklyAccumulator = JSON.parse(localStorage.getItem('quantz_weekly_data')) || {
             '1m':  { binance: [], bybit: [], coinbase: [], okx: [] },
@@ -772,6 +812,7 @@
                 localStorage.setItem('quantz_weekly_num', currentWeekNumber);
 
                 renderWeeklyMatrix();
+                updateWeeklyAnalysis();
             };
         }
 
@@ -813,6 +854,91 @@
             }
 
             tbody.innerHTML = html;
+        }
+
+        // FUNCIÓN QUE GENERAR Y ACTUALIZA EL DIAGNÓSTICO OPERATIVO AUTOMÁTICO EN LA SECCIÓN SEMANAL
+        function updateWeeklyAnalysis() {
+            const getTfAvg = (tf) => {
+                const d = weeklyAccumulator[tf];
+                if (!d) return 50;
+                return (calcAvg(d.binance) + calcAvg(d.bybit) + calcAvg(d.coinbase) + calcAvg(d.okx)) / 4;
+            };
+
+            const avg1m = getTfAvg('1m');
+            const avg5m = getTfAvg('5m');
+            const avg15m = getTfAvg('15m');
+            const avg1h = getTfAvg('1h');
+            const avg4h = getTfAvg('4h');
+            const avg1D = getTfAvg('1D');
+
+            const microAvg = (avg1m + avg5m + avg15m) / 3;
+            const intraAvg = (avg1h + avg4h) / 2;
+
+            // Micro flujo
+            const microBadge = document.getElementById('wk-micro-badge');
+            const microText = document.getElementById('wk-micro-text');
+            if (microAvg >= 55) {
+                microBadge.innerText = 'DOMINANCIA COMPRADORA';
+                microBadge.style.backgroundColor = 'var(--green-bg)';
+                microBadge.style.color = 'var(--green)';
+                microText.innerText = `Fuerte acumulación inmediata (${microAvg.toFixed(1)}% Compras). Los compradores están empujando el precio en el muy corto plazo.`;
+            } else if (microAvg <= 45) {
+                microBadge.innerText = 'DOMINANCIA VENDEDORA';
+                microBadge.style.backgroundColor = 'var(--red-bg)';
+                microBadge.style.color = 'var(--red)';
+                microText.innerText = `Presión vendedora activa en corto plazo (${(100 - microAvg).toFixed(1)}% Ventas). Entrada rápida de liquidez a la baja.`;
+            } else {
+                microBadge.innerText = 'ACUMULACIÓN NEUTRAL';
+                microBadge.style.backgroundColor = 'rgba(240, 185, 11, 0.15)';
+                microBadge.style.color = 'var(--yellow)';
+                microText.innerText = `Equilibrio en micro-temporalidades. Rango estrecho sin dirección clara definida.`;
+            }
+
+            // Intradía
+            const intraBadge = document.getElementById('wk-intra-badge');
+            const intraText = document.getElementById('wk-intra-text');
+            if (intraAvg >= 55) {
+                intraBadge.innerText = 'ESTRUCTURA ALCISTA';
+                intraBadge.style.backgroundColor = 'var(--green-bg)';
+                intraBadge.style.color = 'var(--green)';
+                intraText.innerText = `Intradía consolidado al alza (${intraAvg.toFixed(1)}% Compras). Soporte técnico fuerte en marcos intermedios.`;
+            } else if (intraAvg <= 45) {
+                intraBadge.innerText = 'ESTRUCTURA BAJISTA / RESISTENCIA';
+                intraBadge.style.backgroundColor = 'var(--red-bg)';
+                intraBadge.style.color = 'var(--red)';
+                intraText.innerText = `Bloque de venta estructural (${(100 - intraAvg).toFixed(1)}% Ventas). El precio se topa con resistencia en 1h y 4h.`;
+            } else {
+                intraBadge.innerText = 'CONSOLIDACIÓN INTRADÍA';
+                intraBadge.style.backgroundColor = 'rgba(240, 185, 11, 0.15)';
+                intraBadge.style.color = 'var(--yellow)';
+                intraText.innerText = `Mercado lateral en marcos intermedios. Esperar rompimiento de rango.`;
+            }
+
+            // Estrategia combinada
+            const stratBadge = document.getElementById('wk-strategy-badge');
+            const stratText = document.getElementById('wk-strategy-text');
+
+            if (microAvg >= 55 && intraAvg <= 45 && avg1D >= 55) {
+                stratBadge.innerText = 'ESPERAR GIRO EN 1H';
+                stratBadge.style.backgroundColor = 'rgba(240, 185, 11, 0.15)';
+                stratBadge.style.color = 'var(--yellow)';
+                stratText.innerText = `Divergencia: El impulso rápido (1m-15m) intenta romper la resistencia de 1h/4h. No comprar hasta que 1h supere el 50% C o retroceda a soporte.`;
+            } else if (microAvg >= 55 && intraAvg >= 55) {
+                stratBadge.innerText = 'COMPRA CONFIRMADA';
+                stratBadge.style.backgroundColor = 'var(--green-bg)';
+                stratBadge.style.color = 'var(--green)';
+                stratText.innerText = `Alineación Alcista Total: Flujo alineado a favor de tendencia. Buscar entradas en retrocesos a soporte con mayor ratio R/R.`;
+            } else if (microAvg <= 45 && intraAvg <= 45) {
+                stratBadge.innerText = 'VENTA CONFIRMADA';
+                stratBadge.style.backgroundColor = 'var(--red-bg)';
+                stratBadge.style.color = 'var(--red)';
+                stratText.innerText = `Alineación Bajista Total: Presión vendedora continua en todos los marcos. Priorizar ventas cortas (shorts) hacia mínimos.`;
+            } else {
+                stratBadge.innerText = 'ESPERAR CONFIRMACIÓN';
+                stratBadge.style.backgroundColor = 'rgba(240, 185, 11, 0.15)';
+                stratBadge.style.color = 'var(--yellow)';
+                stratText.innerText = `Direcciones mixtas en la matriz. Operar con cautela utilizando los niveles del gráfico o esperar alineación.`;
+            }
         }
 
         function calcAvg(arr) {
