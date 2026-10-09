@@ -692,9 +692,9 @@
         };
     </script>
 
-    <!-- MOTOR LÓGICO COMPLEMENTARIO PARA ACUMULADO SEMANAL MATRIZ MULTI-BROKER POR TEMPORALIDAD CON DESGLOSE COMPRAS/VENTAS (%) -->
+    <!-- MOTOR LÓGICO COMPLEMENTARIO CON PERSISTENCIA (LOCALSTORAGE) Y DESGLOSE COMPRAS/VENTAS (%) -->
     <script>
-        const weeklyAccumulator = {
+        let weeklyAccumulator = JSON.parse(localStorage.getItem('quantz_weekly_data')) || {
             '1m':  { binance: [], bybit: [], coinbase: [], okx: [] },
             '5m':  { binance: [], bybit: [], coinbase: [], okx: [] },
             '15m': { binance: [], bybit: [], coinbase: [], okx: [] },
@@ -704,6 +704,20 @@
         };
 
         let currentWeekNumber = getISOWeekNumber(new Date());
+        let savedWeek = localStorage.getItem('quantz_weekly_num');
+
+        if (savedWeek && parseInt(savedWeek) !== currentWeekNumber) {
+            weeklyAccumulator = {
+                '1m':  { binance: [], bybit: [], coinbase: [], okx: [] },
+                '5m':  { binance: [], bybit: [], coinbase: [], okx: [] },
+                '15m': { binance: [], bybit: [], coinbase: [], okx: [] },
+                '1h':  { binance: [], bybit: [], coinbase: [], okx: [] },
+                '4h':  { binance: [], bybit: [], coinbase: [], okx: [] },
+                '1D':  { binance: [], bybit: [], coinbase: [], okx: [] }
+            };
+            localStorage.setItem('quantz_weekly_data', JSON.stringify(weeklyAccumulator));
+        }
+        localStorage.setItem('quantz_weekly_num', currentWeekNumber);
 
         function getISOWeekNumber(d) {
             const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
@@ -713,7 +727,6 @@
             return Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
         }
 
-        // Intercepta las llamadas a updateTerminal() sin sobreescribir ni tocar su código
         if (typeof updateTerminal === 'function') {
             const originalUpdateTerminal = updateTerminal;
             
@@ -723,9 +736,14 @@
                 const checkWeek = getISOWeekNumber(new Date());
                 if (checkWeek !== currentWeekNumber) {
                     currentWeekNumber = checkWeek;
-                    for (let tf in weeklyAccumulator) {
-                        weeklyAccumulator[tf] = { binance: [], bybit: [], coinbase: [], okx: [] };
-                    }
+                    weeklyAccumulator = {
+                        '1m':  { binance: [], bybit: [], coinbase: [], okx: [] },
+                        '5m':  { binance: [], bybit: [], coinbase: [], okx: [] },
+                        '15m': { binance: [], bybit: [], coinbase: [], okx: [] },
+                        '1h':  { binance: [], bybit: [], coinbase: [], okx: [] },
+                        '4h':  { binance: [], bybit: [], coinbase: [], okx: [] },
+                        '1D':  { binance: [], bybit: [], coinbase: [], okx: [] }
+                    };
                 }
 
                 const infoTag = document.getElementById('weekly-info-tag');
@@ -749,6 +767,9 @@
                         }
                     }
                 });
+
+                localStorage.setItem('quantz_weekly_data', JSON.stringify(weeklyAccumulator));
+                localStorage.setItem('quantz_weekly_num', currentWeekNumber);
 
                 renderWeeklyMatrix();
             };
