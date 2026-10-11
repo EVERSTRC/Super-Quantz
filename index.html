@@ -513,7 +513,7 @@
         ];
 
         let selectedTF = '1h';
-        let currentBtcPrice = 85180.0;
+        let currentBtcPrice = 83868.0;
         let lastPrice = 0;
         let userPriceLines = [];
         let timerInterval = null;
@@ -532,6 +532,27 @@
         });
 
         let klineWs = null;
+
+        // CARGAR HISTÓRICO REST BINANCE DE 100 VELAS
+        async function loadHistoricalKlines(tf) {
+            const interval = TIMEFRAMES.find(t => t.label === tf)?.binance || '1h';
+            const url = `https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${interval}&limit=100`;
+            try {
+                const res = await fetch(url);
+                const data = await res.json();
+                const formattedData = data.map(d => ({
+                    time: d[0] / 1000,
+                    open: parseFloat(d[1]),
+                    high: parseFloat(d[2]),
+                    low: parseFloat(d[3]),
+                    close: parseFloat(d[4])
+                }));
+                candlestickSeries.setData(formattedData);
+                chart.timeScale().fitContent();
+            } catch (e) {
+                console.error("Error al cargar klines históricos:", e);
+            }
+        }
 
         // LÓGICA TIMER CIERRE VELA
         function getIntervalSeconds(tf) {
@@ -604,7 +625,7 @@
             userPriceLines = [];
         }
 
-        function onTimeframeChange() {
+        async function onTimeframeChange() {
             const selectEl = document.getElementById('tf-analysis-select');
             selectedTF = selectEl.value;
             
@@ -613,6 +634,7 @@
             });
 
             startCandleTimer(selectedTF);
+            await loadHistoricalKlines(selectedTF);
             connectBinanceKlines(selectedTF);
             updateDynamicCalculations();
         }
@@ -727,7 +749,7 @@
         }
     </script>
 
-    <!-- SCRIPT WEBSOCKET ORDERBOOK CON ALERTAS DE BALLENAS -->
+    <!-- SCRIPT WEBSOCKET ORDERBOOK CON ALERTAS DE BALLENAS Y MOTOR DE SCORE IA -->
     <script>
         let depthWs = null;
         let whaleAudioEnabled = true;
@@ -803,6 +825,34 @@
 
             while (list.children.length > 10) {
                 list.removeChild(list.lastChild);
+            }
+        }
+
+        // Detección e Integración del Score IA dinámico según Presión del Order Book
+        function updateAIScore(bidPct, askPct) {
+            const bullVal = document.getElementById('score-bull-val');
+            const bullBar = document.getElementById('score-bull-bar');
+            const bearVal = document.getElementById('score-bear-val');
+            const bearBar = document.getElementById('score-bear-bar');
+            const decisionText = document.getElementById('decision-text');
+
+            if (bullVal && bearVal) {
+                bullVal.innerText = `${bidPct.toFixed(1)}%`;
+                bullBar.style.width = `${bidPct.toFixed(1)}%`;
+                
+                bearVal.innerText = `${askPct.toFixed(1)}%`;
+                bearBar.style.width = `${askPct.toFixed(1)}%`;
+
+                if (bidPct > 55) {
+                    decisionText.innerText = 'ACUMULACIÓN ALCISTA';
+                    decisionText.style.color = 'var(--green)';
+                } else if (askPct > 55) {
+                    decisionText.innerText = 'PRESIÓN VENDEDORA';
+                    decisionText.style.color = 'var(--red)';
+                } else {
+                    decisionText.innerText = 'CONSOLIDACIÓN / NEUTRAL';
+                    decisionText.style.color = 'var(--yellow)';
+                }
             }
         }
 
@@ -905,22 +955,25 @@
                 document.getElementById('ob-current-mid').innerText = `$${midPrice.toFixed(2)}`;
                 document.getElementById('ob-spread-val').innerText = `$${spread.toFixed(2)}`;
 
-                // Presión
+                // Presión y Actualización de Decisión IA
                 if (totalVolSum > 0) {
                     const bidPct = (totalBidVol / totalVolSum) * 100;
                     const askPct = 100 - bidPct;
                     document.getElementById('ob-bid-pressure-bar').style.width = `${bidPct.toFixed(1)}%`;
                     document.getElementById('ob-bids-pct').innerText = `${bidPct.toFixed(1)}% Compras`;
                     document.getElementById('ob-asks-pct').innerText = `${askPct.toFixed(1)}% Ventas`;
+
+                    updateAIScore(bidPct, askPct);
                 }
             };
 
             depthWs.onerror = (err) => console.error("Error WebSocket Depth:", err);
         }
 
-        window.addEventListener('DOMContentLoaded', () => {
+        window.addEventListener('DOMContentLoaded', async () => {
             renderMatrixMock();
             startCandleTimer(selectedTF);
+            await loadHistoricalKlines(selectedTF);
             connectBinanceKlines(selectedTF);
             connectBinanceDepth();
         });
