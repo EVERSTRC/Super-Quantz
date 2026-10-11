@@ -522,16 +522,18 @@
         let lastPrice = 0;
         let userPriceLines = [];
         let projectionPriceLines = []; 
-        let whaleVwapPriceLine = null; // Línea Ponderada VWAP de Ballenas
+        let whaleVwapPriceLine = null;
         let timerInterval = null;
         let lastCandleTimestamp = 0;
 
-        // ESTRUCTURA VWAP DE BALLENAS
+        // ESTRUCTURA VWAP DE BALLENAS Y FLUJO INSTANTÁNEO EN VIVO
         let currentWhaleVwap = 0;
+        let recentWhaleBuyCount = 0;
+        let recentWhaleSellCount = 0;
 
         // MARCADORES Y SEÑALES VISUALES EN EL GRÁFICO (FLECHAS COMPRA/VENTA)
         let chartMarkers = [];
-        let lastSignalState = null; // 'BUY' o 'SELL'
+        let lastSignalState = null; 
 
         // INICIALIZACIÓN DE LIGHTWEIGHT CHARTS
         const chartContainer = document.getElementById('tv-chart');
@@ -548,7 +550,6 @@
 
         let klineWs = null;
 
-        // LIMPIAR LÍNEAS PROYECTADAS (TP Y SL)
         function clearProjectionLines() {
             projectionPriceLines.forEach(line => candlestickSeries.removePriceLine(line));
             projectionPriceLines = [];
@@ -564,7 +565,7 @@
 
             whaleVwapPriceLine = candlestickSeries.createPriceLine({
                 price: vwapPrice,
-                color: '#f0b90b', // Color Dorado de Ballenas
+                color: '#f0b90b',
                 lineWidth: 2,
                 lineStyle: LightweightCharts.LineStyle.Solid,
                 axisLabelVisible: true,
@@ -572,23 +573,27 @@
             });
         }
 
-        // DIBUJAR FLECHA Y PROYECCIONES CON CORRECCIÓN DE NIVELES Y LIMPIEZA DE SOLAPAMIENTO
+        // DIBUJAR FLECHA Y PROYECCIONES: FILTRADO ESTRICTO CON FLUJO EN VIVO DE BALLENAS
         function updateChartSignalMarker(signalType, price) {
             if (!lastCandleTimestamp) return;
 
-            // FILTRO VWAP: No permite señales contradictorias con respecto a la zona de masa institucional
+            // 1. FILTRO VWAP INSTITUCIONAL
             if (signalType === 'BUY' && currentWhaleVwap > 0 && price < currentWhaleVwap) return;
             if (signalType === 'SELL' && currentWhaleVwap > 0 && price > currentWhaleVwap) return;
+
+            // 2. NUEVO FILTRO DE FLUJO EN VIVO DE BALLENAS (>= 10 BTC)
+            // Si la señal es de COMPRA pero hay más ventas gigantes recientes, la anula.
+            if (signalType === 'BUY' && recentWhaleSellCount > recentWhaleBuyCount) return;
+            // Si la señal es de VENTA pero hay más compras gigantes recientes, la anula.
+            if (signalType === 'SELL' && recentWhaleBuyCount > recentWhaleSellCount) return;
 
             if (lastSignalState === signalType) return;
             lastSignalState = signalType;
 
             const isBuy = signalType === 'BUY';
 
-            // 1. OBLIGATORIO: LIMPIAR TODAS LAS LÍNEAS DE PROYECCIÓN ANTERIORES AL CAMBIAR DE SEÑAL
             clearProjectionLines();
 
-            // 2. MANTENER ÚNICAMENTE EL MARCADOR DE LA SEÑAL ACTIVA EN PANTALLA
             const newMarker = {
                 time: lastCandleTimestamp,
                 position: isBuy ? 'belowBar' : 'aboveBar',
@@ -597,12 +602,9 @@
                 text: isBuy ? `COMPRA CONFIRMADA @ $${price.toFixed(1)}` : `VENTA CONFIRMADA @ $${price.toFixed(1)}`
             };
 
-            chartMarkers = [newMarker]; 
+            chartMarkers = [newMarker];
             candlestickSeries.setMarkers(chartMarkers);
 
-            // 3. RECALCULAR Y DIBUJAR NIVELES DE TP Y SL SEGÚN LA DIRECCIÓN REAL DE LA OPERACIÓN
-            // Para COMPRA: TP arriba (+1.5%), SL abajo (-0.8%)
-            // Para VENTA:  TP abajo (-1.5%), SL arriba (+0.8%)
             const targetTpPrice = isBuy ? price * 1.015 : price * 0.985;
             const targetSlPrice = isBuy ? price * 0.992 : price * 1.008;
 
@@ -852,7 +854,6 @@
                 `;
             });
 
-            // POBLADO AUTOMÁTICO DEL DIAGNÓSTICO SEMANAL Y TARJETAS
             document.getElementById('binance-val').innerText = '62% C / 38% V';
             document.getElementById('binance-bar').style.width = '62%';
 
@@ -936,6 +937,13 @@
             const color = isBid ? 'var(--green)' : 'var(--red)';
             const tag = isBid ? 'COMPRA' : 'VENTA';
 
+            // Incrementar contadores en vivo de ballenas
+            if (isBid) {
+                recentWhaleBuyCount++;
+            } else {
+                recentWhaleSellCount++;
+            }
+
             const itemHTML = `
                 <div class="whale-log-item">
                     <span style="color: var(--text-muted);">${timeStr}</span>
@@ -950,7 +958,7 @@
             }
         }
 
-        // EVALUACIÓN DE SCORE IA E INTEGRACIÓN CON LÍNEA VWAP Y SEÑALES ALCISTAS/BAJISTAS
+        // EVALUACIÓN DE SCORE IA E INTEGRACIÓN DIRECTA CON FLUJO EN VIVO Y MARCADORES DEL GRÁFICO
         function updateAIScore(bidPct, askPct) {
             const bullVal = document.getElementById('score-bull-val');
             const bullBar = document.getElementById('score-bull-bar');
@@ -968,12 +976,12 @@
                 bearVal.innerText = `${finalBear.toFixed(1)}%`;
                 bearBar.style.width = `${finalBear.toFixed(1)}%`;
 
-                // EVALUACIÓN DE SEÑAL MEDIANTE PRESIÓN Y VWAP DE BALLENAS
-                if (finalBull >= 60.0) {
+                // EVALUACIÓN INTEGRADA CON EL FLUJO EN VIVO DE LAS BALLENAS
+                if (finalBull >= 60.0 && recentWhaleBuyCount >= recentWhaleSellCount) {
                     decisionText.innerText = 'ACUMULACIÓN ALCISTA CONFIRMADA';
                     decisionText.style.color = 'var(--green)';
                     updateChartSignalMarker('BUY', currentBtcPrice);
-                } else if (finalBear >= 60.0) {
+                } else if (finalBear >= 60.0 && recentWhaleSellCount >= recentWhaleBuyCount) {
                     decisionText.innerText = 'PRESIÓN VENDEDORA CONFIRMADA';
                     decisionText.style.color = 'var(--red)';
                     updateChartSignalMarker('SELL', currentBtcPrice);
@@ -1010,7 +1018,6 @@
                 let whalePrice = 0;
                 let whaleQty = 0;
 
-                // RECALCULO DE VWAP PONDERADO EN VIVO PARA BALLENAS (>= 10 BTC)
                 let currentWhaleBidsVol = 0;
                 let currentWhaleBidsWeighted = 0;
                 let currentWhaleAsksVol = 0;
@@ -1082,7 +1089,7 @@
                     `;
                 });
 
-                // CALCULAR VWAP PONDERADO TOTAL DE BALLENAS
+                // RECALCULO DE VWAP PONDERADO TOTAL
                 const totalWhaleVol = currentWhaleBidsVol + currentWhaleAsksVol;
                 if (totalWhaleVol > 0) {
                     currentWhaleVwap = (currentWhaleBidsWeighted + currentWhaleAsksWeighted) / totalWhaleVol;
