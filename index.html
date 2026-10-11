@@ -220,7 +220,7 @@
             <!-- GRÁFICO LIGHTWEIGHT CHARTS -->
             <section class="panel">
                 <div class="panel-header">
-                    <span class="panel-title">📈 Gráfico BTC/USDT Live (<span class="selected-tf-tag">1h</span>)</span>
+                    <span class="panel-title">📈 Gráfico BTC/USDT Live (<span class="selected-tf-tag">15m</span>)</span>
                     <div class="chart-controls">
                         <input type="number" id="manual-price-input" class="input-price" placeholder="Precio..." step="10">
                         <button class="btn-line" onclick="setCurrentPriceInput()">Precio Actual</button>
@@ -233,7 +233,7 @@
                     <div id="chart-wrapper">
                         <div class="candle-timer-box">
                             <div class="timer-row">
-                                <span class="timer-lbl">Cierre Vela (<span class="selected-tf-tag">1h</span>)</span>
+                                <span class="timer-lbl">Cierre Vela (<span class="selected-tf-tag">15m</span>)</span>
                                 <span class="timer-val" id="candle-timer-val">00:00</span>
                             </div>
                             <div class="timer-progress-bg">
@@ -522,6 +522,11 @@
         let lastPrice = 0;
         let userPriceLines = [];
         let timerInterval = null;
+        let lastCandleTimestamp = 0;
+
+        // MARCADORES Y SEÑALES VISUALES EN EL GRÁFICO (FLECHAS COMPRA/VENTA)
+        let chartMarkers = [];
+        let lastSignalState = null; // 'BUY' o 'SELL'
 
         // INICIALIZACIÓN DE LIGHTWEIGHT CHARTS
         const chartContainer = document.getElementById('tv-chart');
@@ -538,6 +543,30 @@
 
         let klineWs = null;
 
+        // DIBUJAR MARCADORES / FLECHAS EN EL GRÁFICO
+        function updateChartSignalMarker(signalType, price) {
+            if (!lastCandleTimestamp) return;
+
+            // Evitar duplicados seguidos de la misma dirección en el mismo estado
+            if (lastSignalState === signalType) return;
+            lastSignalState = signalType;
+
+            const isBuy = signalType === 'BUY';
+            const newMarker = {
+                time: lastCandleTimestamp,
+                position: isBuy ? 'belowBar' : 'aboveBar',
+                color: isBuy ? '#0ecb81' : '#f6465d',
+                shape: isBuy ? 'arrowUp' : 'arrowDown',
+                text: isBuy ? `COMPRA @ $${price.toFixed(1)}` : `VENTA @ $${price.toFixed(1)}`
+            };
+
+            // Mantener un historial limpio de hasta 15 señales en pantalla
+            chartMarkers.push(newMarker);
+            if (chartMarkers.length > 15) chartMarkers.shift();
+
+            candlestickSeries.setMarkers(chartMarkers);
+        }
+
         // CARGAR HISTÓRICO REST BINANCE DE 100 VELAS
         async function loadHistoricalKlines(tf) {
             const interval = TIMEFRAMES.find(t => t.label === tf)?.binance || '15m';
@@ -552,6 +581,11 @@
                     low: parseFloat(d[3]),
                     close: parseFloat(d[4])
                 }));
+
+                if (formattedData.length > 0) {
+                    lastCandleTimestamp = formattedData[formattedData.length - 1].time;
+                }
+
                 candlestickSeries.setData(formattedData);
                 chart.timeScale().fitContent();
             } catch (e) {
@@ -638,6 +672,11 @@
                 tag.innerText = selectedTF;
             });
 
+            // Limpiar marcadores al cambiar marco temporal
+            chartMarkers = [];
+            lastSignalState = null;
+            candlestickSeries.setMarkers([]);
+
             startCandleTimer(selectedTF);
             await loadHistoricalKlines(selectedTF);
             connectBinanceKlines(selectedTF);
@@ -666,6 +705,7 @@
                 if (message.e === 'kline') {
                     const k = message.k;
                     currentBtcPrice = parseFloat(k.c);
+                    lastCandleTimestamp = k.t / 1000;
                     
                     const priceEl = document.getElementById('binance-price');
                     if (priceEl) {
@@ -680,7 +720,7 @@
                     document.getElementById('binance-low').innerText = `$${parseFloat(k.l).toLocaleString('en-US')}`;
 
                     candlestickSeries.update({
-                        time: k.t / 1000,
+                        time: lastCandleTimestamp,
                         open: parseFloat(k.o),
                         high: parseFloat(k.h),
                         low: parseFloat(k.l),
@@ -850,7 +890,7 @@
             }
         }
 
-        // Detección e Integración del Score IA dinámico según Presión del Order Book
+        // Detección e Integración del Score IA dinámico con Flechas en el Gráfico
         function updateAIScore(bidPct, askPct) {
             const bullVal = document.getElementById('score-bull-val');
             const bullBar = document.getElementById('score-bull-bar');
@@ -859,7 +899,6 @@
             const decisionText = document.getElementById('decision-text');
 
             if (bullVal && bearVal) {
-                // Ponderación dinámica que mezcla la presión instantánea del Order Book
                 const finalBull = Math.min(Math.max(bidPct * 1.4, 20), 92);
                 const finalBear = 100 - finalBull;
 
@@ -872,9 +911,11 @@
                 if (finalBull > 55) {
                     decisionText.innerText = 'ACUMULACIÓN ALCISTA';
                     decisionText.style.color = 'var(--green)';
+                    updateChartSignalMarker('BUY', currentBtcPrice);
                 } else if (finalBear > 55) {
                     decisionText.innerText = 'PRESIÓN VENDEDORA';
                     decisionText.style.color = 'var(--red)';
+                    updateChartSignalMarker('SELL', currentBtcPrice);
                 } else {
                     decisionText.innerText = 'CONSOLIDACIÓN / NEUTRAL';
                     decisionText.style.color = 'var(--yellow)';
