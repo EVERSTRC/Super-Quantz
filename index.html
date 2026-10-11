@@ -456,76 +456,72 @@
         </section>
     </main>
 
-    <!-- INTEGRACIÓN CON TELEGRAM BOT -->
+    <!-- SCRIPT DE TELEGRAM INTELIGENTE (NO REEMPLAZA NINGÚN SCRIPT EXISTENTE) -->
     <script>
-        // CONFIGURACIÓN DE TELEGRAM
-        // Reemplaza con el Token de tu Bot de Telegram y tu ID de Chat
-        const TELEGRAM_BOT_TOKEN = "TU_BOT_TOKEN_AQUI"; 
-        const TELEGRAM_CHAT_ID = "50672325001"; // ID basado en el número asignado en tu perfil
+        (function() {
+            // Reemplaza esto únicamente con tu Token de Telegram Bot
+            const TELEGRAM_BOT_TOKEN = "AQUÍ_TU_BOT_TOKEN_DE_BOTFATHER"; 
+            const TELEGRAM_CHAT_ID = "50672325001"; // ID asociado a tu perfil
 
-        let previousBuyState = "";
-        let previousSellState = "";
+            let prevBuyState = "";
+            let prevSellState = "";
 
-        // Función para enviar mensajes directamente a Telegram
-        function sendTelegramNotification(message) {
-            if (!TELEGRAM_BOT_TOKEN || TELEGRAM_BOT_TOKEN === "TU_BOT_TOKEN_AQUI") {
-                console.warn("Telegram Bot Token no configurado.");
-                return;
+            function sendTelegramAlert(buyStatus, sellStatus, price, note) {
+                if (!TELEGRAM_BOT_TOKEN || TELEGRAM_BOT_TOKEN === "AQUÍ_TU_BOT_TOKEN_DE_BOTFATHER") {
+                    console.warn("Falta configurar el TELEGRAM_BOT_TOKEN.");
+                    return;
+                }
+
+                const msg = `🎯 *CAMBIO EN ASESOR DE DECISIÓN*\n` +
+                            `----------------------------------------\n` +
+                            `🟢 *Op. COMPRA (LONG):* ${buyStatus}\n` +
+                            `🔴 *Op. VENTA (SHORT):* ${sellStatus}\n` +
+                            `💵 *Precio BTC:* ${price}\n` +
+                            `📝 *Evaluación:* ${note}`;
+
+                fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        chat_id: TELEGRAM_CHAT_ID,
+                        text: msg,
+                        parse_mode: "Markdown"
+                    })
+                })
+                .then(res => res.json())
+                .then(data => console.log("Notificación Telegram enviada exitosamente:", data))
+                .catch(err => console.error("Error al enviar a Telegram:", err));
             }
 
-            const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
-            fetch(url, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    chat_id: TELEGRAM_CHAT_ID,
-                    text: message,
-                    parse_mode: "Markdown"
-                })
-            })
-            .then(res => res.json())
-            .then(data => console.log("Notificación Telegram enviada:", data))
-            .catch(err => console.error("Error al enviar notificación Telegram:", err));
-        }
+            window.addEventListener("DOMContentLoaded", () => {
+                const buyEl = document.getElementById("adv-buy-status");
+                const sellEl = document.getElementById("adv-sell-status");
 
-        // Monitoreo constante del Asesor de Decisión mediante MutationObserver
-        window.addEventListener("DOMContentLoaded", () => {
-            const buyElem = document.getElementById("adv-buy-status");
-            const sellElem = document.getElementById("adv-sell-status");
+                if (buyEl) prevBuyState = buyEl.innerText.trim();
+                if (sellEl) prevSellState = sellEl.innerText.trim();
 
-            if (buyElem) previousBuyState = buyElem.innerText.trim();
-            if (sellElem) previousSellState = sellElem.innerText.trim();
+                const checkAdvisorChanges = () => {
+                    const currentBuy = buyEl ? buyEl.innerText.trim() : "";
+                    const currentSell = sellEl ? sellEl.innerText.trim() : "";
 
-            const checkAdvisorChanges = () => {
-                const currentBuyState = buyElem ? buyElem.innerText.trim() : "";
-                const currentSellState = sellElem ? sellElem.innerText.trim() : "";
+                    if ((currentBuy !== prevBuyState && currentBuy !== "") || 
+                        (currentSell !== prevSellState && currentSell !== "")) {
 
-                if ((currentBuyState !== previousBuyState && currentBuyState !== "") || 
-                    (currentSellState !== previousSellState && currentSellState !== "")) {
+                        const currentPrice = document.getElementById("binance-price")?.innerText || "N/A";
+                        const summaryNote = document.getElementById("adv-summary-note")?.innerText || "";
 
-                    const currentPrice = document.getElementById("binance-price")?.innerText || "N/A";
-                    const summaryNote = document.getElementById("adv-summary-note")?.innerText || "";
+                        sendTelegramAlert(currentBuy, currentSell, currentPrice, summaryNote);
 
-                    const telegramMessage = 
-`🎯 *CAMBIO EN ASESOR DE DECISIÓN*
-----------------------------------------
-🟢 *Op. COMPRA (LONG):* ${currentBuyState}
-🔴 *Op. VENTA (SHORT):* ${currentSellState}
-💵 *Precio Actual BTC:* ${currentPrice}
-📝 *Evaluación:* ${summaryNote}`;
+                        prevBuyState = currentBuy;
+                        prevSellState = currentSell;
+                    }
+                };
 
-                    sendTelegramNotification(telegramMessage);
-
-                    previousBuyState = currentBuyState;
-                    previousSellState = currentSellState;
-                }
-            };
-
-            // Observer para detectar cuando cambie el HTML dentro de los estados del asesor
-            const observer = new MutationObserver(checkAdvisorChanges);
-            if (buyElem) observer.observe(buyElem, { childList: true, characterData: true, subtree: true });
-            if (sellElem) observer.observe(sellElem, { childList: true, characterData: true, subtree: true });
-        });
+                const observer = new MutationObserver(checkAdvisorChanges);
+                if (buyEl) observer.observe(buyEl, { childList: true, characterData: true, subtree: true });
+                if (sellEl) observer.observe(sellEl, { childList: true, characterData: true, subtree: true });
+            });
+        })();
     </script>
 </body>
 </html>
