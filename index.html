@@ -74,26 +74,66 @@
         #chart-wrapper { width: 100%; height: 420px; position: relative; background-color: #131722; border-radius: 6px; overflow: hidden; border: 1px solid var(--border-color); }
         #tv-chart { width: 100%; height: 100%; }
 
-        /* TABLA DE BROKERS */
+        /* ESTILOS DEL ORDER BOOK CON ALERTAS DE BALLENAS */
+        .ob-container { display: flex; flex-direction: column; gap: 8px; font-family: 'Roboto Mono', monospace; }
+        .ob-header { display: grid; grid-template-columns: 1.2fr 1fr 1.2fr; font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; padding: 0 4px 4px 4px; border-bottom: 1px solid var(--border-color); text-align: right; }
+        .ob-header div:first-child { text-align: left; }
+        
+        .ob-list { display: flex; flex-direction: column; gap: 2px; }
+        .ob-row { display: grid; grid-template-columns: 1.2fr 1fr 1.2fr; font-size: 0.78rem; padding: 3px 4px; position: relative; border-radius: 2px; text-align: right; align-items: center; transition: all 0.2s ease; }
+        .ob-row div:first-child { text-align: left; font-weight: 700; display: flex; align-items: center; gap: 4px; }
+        
+        .ob-bg-fill { position: absolute; top: 0; right: 0; bottom: 0; z-index: 0; opacity: 0.25; border-radius: 2px; transition: width 0.1s ease; }
+        .ob-row span { position: relative; z-index: 1; }
+
+        .ob-ask .price { color: var(--red); }
+        .ob-ask .ob-bg-fill { background-color: var(--red); }
+        
+        .ob-bid .price { color: var(--green); }
+        .ob-bid .ob-bg-fill { background-color: var(--green); }
+
+        .ob-row-whale {
+            animation: whalePulse 0.8s infinite alternate;
+            border: 1px solid var(--yellow) !important;
+            background-color: rgba(240, 185, 11, 0.18) !important;
+        }
+        .whale-tag {
+            background: linear-gradient(135deg, var(--yellow), #f39c12);
+            color: #000;
+            font-size: 0.6rem;
+            font-weight: 900;
+            padding: 1px 4px;
+            border-radius: 3px;
+            letter-spacing: 0.5px;
+        }
+
+        @keyframes whalePulse {
+            0% { box-shadow: inset 0 0 4px rgba(240, 185, 11, 0.4); }
+            100% { box-shadow: inset 0 0 12px rgba(240, 185, 11, 0.9); }
+        }
+
+        .ob-mid-price { background: var(--bg-body); border: 1px solid var(--border-color); border-radius: 6px; padding: 6px 12px; margin: 4px 0; display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; font-weight: 800; }
+        .ob-spread-tag { font-size: 0.7rem; color: var(--text-muted); font-weight: 600; }
+
+        .ob-pressure-bar-bg { height: 6px; background-color: rgba(246, 70, 93, 0.3); border-radius: 3px; overflow: hidden; display: flex; margin-top: 8px; }
+        .ob-pressure-bar-fill { height: 100%; background-color: var(--green); transition: width 0.2s ease; }
+        .ob-pressure-labels { display: flex; justify-content: space-between; font-size: 0.68rem; font-weight: 700; margin-top: 4px; }
+
+        .whale-log-box { margin-top: 10px; background: var(--bg-body); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; max-height: 85px; overflow-y: auto; font-size: 0.7rem; }
+        .whale-log-item { display: flex; justify-content: space-between; padding: 2px 0; border-bottom: 1px dashed rgba(255,255,255,0.05); }
+
+        /* TABLAS Y TARJETAS */
         .pro-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; text-align: center; }
         .pro-table th { background-color: var(--bg-body); color: var(--text-muted); padding: 10px 8px; font-weight: 600; border-bottom: 1px solid var(--border-color); font-size: 0.75rem; text-transform: uppercase; }
         .pro-table td { padding: 8px 6px; border-bottom: 1px solid #1f2430; font-family: 'Roboto Mono', monospace; }
-        .row-active { outline: 2px solid var(--yellow); background-color: rgba(240, 185, 11, 0.08) !important; }
-        .cell-buy { background-color: var(--green-bg); color: var(--green); font-weight: 600; border-radius: 4px; padding: 3px 8px; }
-        .cell-sell { background-color: var(--red-bg); color: var(--red); font-weight: 600; border-radius: 4px; padding: 3px 8px; }
-        .whale-badge { background-color: rgba(156, 39, 176, 0.25); color: #d8b4fe; font-size: 0.7rem; padding: 2px 5px; border-radius: 3px; margin-left: 4px; }
-
-        /* ACUMULADO POR BROKER */
+        
         .broker-accum-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
         .broker-card { background-color: var(--bg-body); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 6px; }
         .broker-card-header { display: flex; justify-content: space-between; align-items: center; }
         .broker-name { font-size: 0.8rem; font-weight: 700; color: #ffffff; }
         .broker-status-tag { font-size: 0.68rem; font-weight: 800; padding: 2px 6px; border-radius: 4px; }
-        .tag-buy { background-color: var(--green-bg); color: var(--green); }
-        .tag-sell { background-color: var(--red-bg); color: var(--red); }
         .accum-val { font-size: 0.95rem; font-weight: 800; font-family: 'Roboto Mono', monospace; }
 
-        /* MOTOR IA Y DECISIÓN */
         .ai-overview { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; }
         .ai-card { background-color: var(--bg-body); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 6px; }
         .ai-card-title { font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600; }
@@ -120,7 +160,6 @@
 
         .select-tf { background-color: var(--bg-body); color: var(--yellow); border: 1px solid var(--yellow); padding: 6px 12px; border-radius: 4px; font-size: 0.85rem; font-weight: bold; outline: none; cursor: pointer; }
 
-        /* ESTILOS PARA EL ANÁLISIS DENTRO DEL ACUMULADO SEMANAL */
         .weekly-analysis-container { margin-top: 15px; padding-top: 15px; border-top: 1px dashed var(--border-color); }
         .weekly-analysis-header { font-size: 0.85rem; font-weight: 700; color: var(--cyan); margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
         .weekly-analysis-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
@@ -129,7 +168,6 @@
         .analysis-text { font-size: 0.8rem; line-height: 1.4; color: var(--text-main); }
         .analysis-badge { padding: 2px 6px; border-radius: 3px; font-size: 0.68rem; font-weight: 800; }
 
-        /* NUEVOS ESTILOS PARA RECOMENDACIÓN DE ENTRADA Y SALIDA GLOBAL */
         .global-trade-card { background: linear-gradient(145deg, rgba(21, 25, 36, 0.95), rgba(11, 14, 20, 0.98)); border: 1px solid var(--cyan); border-radius: 8px; padding: 14px; margin-top: 15px; }
         .global-trade-header { font-size: 0.88rem; font-weight: 800; color: var(--cyan); margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
         .global-trade-type { font-size: 0.75rem; padding: 3px 8px; border-radius: 4px; text-transform: uppercase; font-weight: 900; }
@@ -137,7 +175,7 @@
 </head>
 <body>
 
-    <!-- NAVBAR SUPERIOR CON TICKER EN TIEMPO REAL -->
+    <!-- NAVBAR SUPERIOR -->
     <header class="top-nav">
         <div class="brand">
             <span>Quantz IA</span>
@@ -172,9 +210,9 @@
     <!-- CONTENEDOR PRINCIPAL -->
     <main class="main-container">
 
-        <!-- COLUMNA IZQUIERDA: GRÁFICO + MATRIZ + ACUMULADO -->
+        <!-- COLUMNA IZQUIERDA -->
         <div>
-            <!-- SECCIÓN GRÁFICO CON HERRAMIENTAS Y TIMER DE VELA -->
+            <!-- GRÁFICO LIGHTWEIGHT CHARTS -->
             <section class="panel">
                 <div class="panel-header">
                     <span class="panel-title">📈 Gráfico BTC/USDT Live (<span class="selected-tf-tag">1h</span>)</span>
@@ -188,7 +226,6 @@
                 </div>
                 <div class="panel-body" style="padding: 10px;">
                     <div id="chart-wrapper">
-                        <!-- CAJA DEL CONTADOR / TIMER VELA -->
                         <div class="candle-timer-box">
                             <div class="timer-row">
                                 <span class="timer-lbl">Cierre Vela (<span class="selected-tf-tag">1h</span>)</span>
@@ -198,8 +235,53 @@
                                 <div class="timer-progress-fill" id="candle-timer-bar"></div>
                             </div>
                         </div>
-
                         <div id="tv-chart"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ORDER BOOK & DEPTH CON ALERTAS DE BALLENAS -->
+            <section class="panel" id="orderbook-panel">
+                <div class="panel-header">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span class="panel-title">📖 Libro de Órdenes & Profundidad (Binance Spot)</span>
+                        <span style="font-size: 0.72rem; color: var(--cyan); font-weight: 700;">100ms Live Feed</span>
+                    </div>
+                    <button id="whale-sound-btn" class="btn-line" onclick="toggleWhaleAudio()" style="border-color: var(--yellow); color: var(--yellow);">
+                        🔊 Audio Ballenas: ON
+                    </button>
+                </div>
+                <div class="panel-body" style="padding: 12px;">
+                    <div class="ob-container">
+                        <div class="ob-header">
+                            <div>Precio (USDT)</div>
+                            <div>Cantidad (BTC)</div>
+                            <div>Total (USDT)</div>
+                        </div>
+
+                        <div class="ob-list" id="ob-asks-list"></div>
+
+                        <div class="ob-mid-price">
+                            <span id="ob-current-mid" style="color: #ffffff;">$0.00</span>
+                            <span class="ob-spread-tag">Spread: <span id="ob-spread-val" style="color: var(--yellow);">0.00</span></span>
+                        </div>
+
+                        <div class="ob-list" id="ob-bids-list"></div>
+
+                        <div>
+                            <div class="ob-pressure-bar-bg">
+                                <div class="ob-pressure-bar-fill" id="ob-bid-pressure-bar" style="width: 50%;"></div>
+                            </div>
+                            <div class="ob-pressure-labels">
+                                <span style="color: var(--green);" id="ob-bids-pct">50.0% Compras</span>
+                                <span style="color: var(--red);" id="ob-asks-pct">50.0% Ventas</span>
+                            </div>
+                        </div>
+
+                        <div class="whale-log-box" id="whale-log-container">
+                            <div style="color: var(--text-muted); font-size: 0.65rem; font-weight: 700; margin-bottom: 4px;">📡 ALERTA DE BALLENAS (&ge; 10 BTC):</div>
+                            <div id="whale-log-list"></div>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -259,7 +341,7 @@
             </section>
         </div>
 
-        <!-- COLUMNA DERECHA: DECISIÓN DE IA Y ESTRATEGIA -->
+        <!-- COLUMNA DERECHA -->
         <section class="panel">
             <div class="panel-header">
                 <span class="panel-title">🧠 Motor de Decisión & Estrategia IA</span>
@@ -288,13 +370,13 @@
                     </div>
                 </div>
 
-                <!-- BANDEROLA DE RECOMENDACIÓN FINAL -->
+                <!-- BANDEROLA DE RECOMENDACIÓN -->
                 <div class="decision-banner" id="decision-box">
                     <div class="decision-title">RECOMENDACIÓN FINAL IA (<span class="selected-tf-tag">1h</span>)</div>
                     <div class="decision-value" id="decision-text" style="color: var(--yellow);">EVALUANDO MERCADO...</div>
                 </div>
 
-                <!-- MÉTRICAS CUANTITATIVAS AVANZADAS -->
+                <!-- MÉTRICAS CUANTITATIVAS -->
                 <div class="metrics-grid-4">
                     <div class="metric-card">
                         <div class="lbl">Divergencia Smart Money</div>
@@ -314,7 +396,7 @@
                     </div>
                 </div>
 
-                <!-- OPCIÓN A: RETROCESO -->
+                <!-- OPCIÓN A -->
                 <div class="trade-option-card">
                     <div class="option-header">🔹 OPCIÓN A: Retroceso al Soporte (Mayor R/R)</div>
                     <div class="option-grid">
@@ -325,7 +407,7 @@
                     </div>
                 </div>
 
-                <!-- OPCIÓN B: RUPTURA -->
+                <!-- OPCIÓN B -->
                 <div class="trade-option-card">
                     <div class="option-header">🔹 OPCIÓN B: Ruptura / Breakout</div>
                     <div class="option-grid">
@@ -340,7 +422,7 @@
 
     </main>
 
-    <!-- SECCIÓN ADICIONAL: ACUMULADO SEMANAL MATRIZ MULTI-BROKER CON DIAGNÓSTICO Y RECOMENDACIÓN GLOBAL DE ENTRADA/SALIDA -->
+    <!-- ACUMULADO SEMANAL MATRIZ MULTI-BROKER -->
     <section class="panel" style="max-width: 1600px; width: 100%; margin: 0 auto 20px auto;">
         <div class="panel-header">
             <span class="panel-title">📅 Acumulado Semanal - Matriz Multi-Broker por Temporalidad (% Compras / % Ventas)</span>
@@ -359,13 +441,11 @@
                             <th>Promedio Global TF</th>
                         </tr>
                     </thead>
-                    <tbody id="weekly-matrix-tbody">
-                        <!-- Carga dinámicamente -->
-                    </tbody>
+                    <tbody id="weekly-matrix-tbody"></tbody>
                 </table>
             </div>
 
-            <!-- ANÁLISIS Y DIAGNÓSTICO INTEGRADO PARA LA SECCIÓN SEMANAL -->
+            <!-- DIAGNÓSTICO INTEGRADO -->
             <div class="weekly-analysis-container">
                 <div class="weekly-analysis-header">
                     <span>🧠 Diagnóstico Cuantitativo & Toma de Decisiones Semanal</span>
@@ -394,7 +474,7 @@
                     </div>
                 </div>
 
-                <!-- TARJETA CON LA MEJOR RECOMENDACIÓN GLOBAL DE ENTRADA Y SALIDA -->
+                <!-- RECOMENDACIÓN OPERATIVA GLOBAL -->
                 <div class="global-trade-card">
                     <div class="global-trade-header">
                         <span>🎯 RECOMENDACIÓN OPERATIVA GLOBAL (ENTRADAS / SALIDAS EN VIVO)</span>
@@ -421,10 +501,10 @@
                 </div>
 
             </div>
-
         </div>
     </section>
 
+    <!-- SCRIPT PRINCIPAL GENERAL DE LA TERMINAL -->
     <script>
         const TIMEFRAMES = [
             { label: '1m', binance: '1m' }, { label: '5m', binance: '5m' },
@@ -438,7 +518,7 @@
         let userPriceLines = [];
         let timerInterval = null;
 
-        // INICIALIZACIÓN DE LIGHTWEIGHT CHARTS (TRADINGVIEW)
+        // INICIALIZACIÓN DE LIGHTWEIGHT CHARTS
         const chartContainer = document.getElementById('tv-chart');
         const chart = LightweightCharts.createChart(chartContainer, {
             layout: { background: { type: 'solid', color: '#131722' }, textColor: '#d1d4dc' },
@@ -453,7 +533,7 @@
 
         let klineWs = null;
 
-        // LÓGICA DEL CONTADOR / TIMER DE CIERRE DE VELA
+        // LÓGICA TIMER CIERRE VELA
         function getIntervalSeconds(tf) {
             if (tf === '1m') return 60;
             if (tf === '5m') return 300;
@@ -494,7 +574,7 @@
             timerInterval = setInterval(updateTimer, 1000);
         }
 
-        // HERRAMIENTAS MANUALES DE SOPORTES Y RESISTENCIAS
+        // HERRAMIENTAS MANUALES
         function setCurrentPriceInput() {
             document.getElementById('manual-price-input').value = currentBtcPrice.toFixed(1);
         }
@@ -505,13 +585,13 @@
             
             const isSupport = type === 'support';
             const color = isSupport ? '#0ecb81' : '#f6465d';
-            const title = isSupport ? `[ SOPORTE MANUAL: $${price.toFixed(1)} ]` : `[ RESISTENCIA MANUAL: $${price.toFixed(1)} ]`;
+            const title = isSupport ? `[ SOPORTE: $${price.toFixed(1)} ]` : `[ RESISTENCIA: $${price.toFixed(1)} ]`;
 
             const priceLine = candlestickSeries.createPriceLine({
                 price: price,
                 color: color,
                 lineWidth: 2,
-                lineStyle: LightweightCharts.LineStyle.Solid,
+                lineStyle: LightweightCharts.LineStyle.Dashed,
                 axisLabelVisible: true,
                 title: title,
             });
@@ -524,506 +604,326 @@
             userPriceLines = [];
         }
 
-        // WEBSOCKET DE CANDLESTICKS EN VIVO Y HISTÓRICO
-        async function loadChartCandles(tf) {
+        function onTimeframeChange() {
+            const selectEl = document.getElementById('tf-analysis-select');
+            selectedTF = selectEl.value;
+            
+            document.querySelectorAll('.selected-tf-tag').forEach(tag => {
+                tag.innerText = selectedTF;
+            });
+
+            startCandleTimer(selectedTF);
+            connectBinanceKlines(selectedTF);
+            updateDynamicCalculations();
+        }
+
+        // WEBSOCKET BINANCE SPOT KLINES
+        function connectBinanceKlines(tf) {
             if (klineWs) klineWs.close();
 
-            try {
-                const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${tf}&limit=200`);
-                const data = await res.json();
-                const formattedCandles = data.map(d => ({
-                    time: Math.floor(d[0] / 1000),
-                    open: parseFloat(d[1]),
-                    high: parseFloat(d[2]),
-                    low: parseFloat(d[3]),
-                    close: parseFloat(d[4])
-                }));
-                candlestickSeries.setData(formattedCandles);
-            } catch (e) {
-                console.error("Error cargando klines históricas", e);
-            }
+            const interval = TIMEFRAMES.find(t => t.label === tf)?.binance || '1h';
+            const wsUrl = `wss://stream.binance.com:9443/ws/btcusdt@kline_${interval}`;
+            klineWs = new WebSocket(wsUrl);
 
-            klineWs = new WebSocket(`wss://stream.binance.com:9443/ws/btcusdt@kline_${tf}`);
+            const wsStatusEl = document.getElementById('ws-status');
+
+            klineWs.onopen = () => {
+                if (wsStatusEl) {
+                    wsStatusEl.innerText = 'Conectado (' + interval + ')';
+                    wsStatusEl.style.color = 'var(--green)';
+                }
+            };
+
             klineWs.onmessage = (event) => {
                 const message = JSON.parse(event.data);
-                if (message.k) {
+                if (message.e === 'kline') {
                     const k = message.k;
+                    currentBtcPrice = parseFloat(k.c);
+                    
+                    const priceEl = document.getElementById('binance-price');
+                    if (priceEl) {
+                        priceEl.innerText = `$${currentBtcPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+                        if (lastPrice > 0) {
+                            priceEl.className = currentBtcPrice >= lastPrice ? 'ticker-price price-up' : 'ticker-price price-down';
+                        }
+                        lastPrice = currentBtcPrice;
+                    }
+
+                    document.getElementById('binance-high').innerText = `$${parseFloat(k.h).toLocaleString('en-US')}`;
+                    document.getElementById('binance-low').innerText = `$${parseFloat(k.l).toLocaleString('en-US')}`;
+
                     candlestickSeries.update({
-                        time: Math.floor(k.t / 1000),
+                        time: k.t / 1000,
                         open: parseFloat(k.o),
                         high: parseFloat(k.h),
                         low: parseFloat(k.l),
                         close: parseFloat(k.c)
                     });
+
+                    updateDynamicCalculations();
+                }
+            };
+
+            klineWs.onerror = () => {
+                if (wsStatusEl) {
+                    wsStatusEl.innerText = 'Error de conexión';
+                    wsStatusEl.style.color = 'var(--red)';
                 }
             };
         }
 
-        // WEBSOCKET BINANCE SPOT (TICKER SUPERIOR)
-        function initBinanceWebSocket() {
-            const ws = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@ticker');
+        // CÁLCULOS DINÁMICOS DE NIVELES IA
+        function updateDynamicCalculations() {
+            if (!currentBtcPrice) return;
 
-            ws.onopen = () => { document.getElementById('ws-status').innerText = "Activo (WS)"; };
+            const supp = currentBtcPrice * 0.985;
+            const res = currentBtcPrice * 1.015;
 
-            ws.onmessage = (event) => {
-                const data = JSON.parse(event.data);
-                const newPrice = parseFloat(data.c);
-                const highPrice = parseFloat(data.h);
-                const lowPrice = parseFloat(data.l);
-                const percentChange = parseFloat(data.P);
+            document.getElementById('opt-a-entry').innerText = `$${supp.toFixed(1)}`;
+            document.getElementById('opt-a-sl').innerText = `$${(supp * 0.992).toFixed(1)}`;
+            document.getElementById('opt-a-tp1').innerText = `$${currentBtcPrice.toFixed(1)}`;
+            document.getElementById('opt-a-tp2').innerText = `$${res.toFixed(1)}`;
 
-                const priceEl = document.getElementById('binance-price');
-                priceEl.className = newPrice > lastPrice ? 'ticker-price price-up' : (newPrice < lastPrice ? 'ticker-price price-down' : 'ticker-price');
-                lastPrice = newPrice;
-                currentBtcPrice = newPrice;
+            document.getElementById('opt-b-entry').innerText = `$${(res * 1.002).toFixed(1)}`;
+            document.getElementById('opt-b-sl').innerText = `$${(res * 0.995).toFixed(1)}`;
+            document.getElementById('opt-b-tp1').innerText = `$${(res * 1.02).toFixed(1)}`;
 
-                priceEl.innerText = `$${newPrice.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
-                document.getElementById('binance-high').innerText = `$${highPrice.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
-                document.getElementById('binance-low').innerText = `$${lowPrice.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
-
-                const changeEl = document.getElementById('binance-change');
-                changeEl.innerText = `${percentChange >= 0 ? '+' : ''}${percentChange.toFixed(2)}%`;
-                changeEl.style.color = percentChange >= 0 ? 'var(--green)' : 'var(--red)';
-            };
-
-            ws.onclose = () => { 
-                document.getElementById('ws-status').innerText = "Reconectando...";
-                setTimeout(initBinanceWebSocket, 3000); 
-            };
+            document.getElementById('wk-entry-val').innerText = `$${supp.toFixed(1)}`;
+            document.getElementById('wk-sl-val').innerText = `$${(supp * 0.99).toFixed(1)}`;
+            document.getElementById('wk-tp1-val').innerText = `$${currentBtcPrice.toFixed(1)}`;
+            document.getElementById('wk-tp2-val').innerText = `$${res.toFixed(1)}`;
         }
 
-        async function fetchKlines(tf) {
-            try {
-                const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${tf}&limit=20`);
-                const data = await res.json();
-                if (Array.isArray(data) && data.length > 0) {
-                    const last = data[data.length - 1];
-                    const high = parseFloat(last[2]), low = parseFloat(last[3]), close = parseFloat(last[4]), vol = parseFloat(last[5]);
-                    const range = high - low;
-                    const buyVol = range > 0 ? vol * ((close - low) / range) : vol * 0.5;
-                    const pctBuy = Math.round((buyVol / vol) * 100);
-                    return { pctBuy, isWhale: vol > 250, high, low, close, vol };
-                }
-            } catch (e) {}
-            return { pctBuy: 50, isWhale: false, high: currentBtcPrice * 1.002, low: currentBtcPrice * 0.998, close: currentBtcPrice, vol: 100 };
-        }
-
-        async function updateTerminal() {
-            let matrixHtml = '';
-            let activeData = null;
-            let binanceBuy = 50, coinbaseBuy = 50;
-
-            let bSum = 0, bySum = 0, cbSum = 0, okSum = 0;
-
-            for (const tfObj of TIMEFRAMES) {
-                const bData = await fetchKlines(tfObj.binance);
-                const byBuy = Math.min(Math.max(bData.pctBuy + Math.floor((Math.random() - 0.5) * 4), 10), 90);
-                const cbBuy = Math.min(Math.max(bData.pctBuy + Math.floor((Math.random() - 0.5) * 6), 10), 90);
-                const okBuy = Math.min(Math.max(bData.pctBuy + Math.floor((Math.random() - 0.5) * 4), 10), 90);
-
-                bSum += bData.pctBuy;
-                bySum += byBuy;
-                cbSum += cbBuy;
-                okSum += okBuy;
-
-                const isActive = tfObj.label === selectedTF;
-                if (isActive) {
-                    activeData = bData;
-                    binanceBuy = bData.pctBuy;
-                    coinbaseBuy = cbBuy;
-                }
-
-                const activeClass = isActive ? 'row-active' : '';
-
-                matrixHtml += `
-                    <tr class="${activeClass}">
-                        <td style="font-weight:700;">${tfObj.label}</td>
-                        <td><span class="${bData.pctBuy >= 50 ? 'cell-buy' : 'cell-sell'}">${bData.pctBuy}%</span>${bData.isWhale ? '<span class="whale-badge">🐋</span>' : ''}</td>
-                        <td><span class="${byBuy >= 50 ? 'cell-buy' : 'cell-sell'}">${byBuy}%</span></td>
-                        <td><span class="${cbBuy >= 50 ? 'cell-buy' : 'cell-sell'}">${cbBuy}%</span></td>
-                        <td><span class="${okBuy >= 50 ? 'cell-buy' : 'cell-sell'}">${okBuy}%</span></td>
+        // POBLAR MATRICES MOCK
+        function renderMatrixMock() {
+            const tbody = document.getElementById('matrix-tbody');
+            tbody.innerHTML = '';
+            TIMEFRAMES.forEach(tf => {
+                tbody.innerHTML += `
+                    <tr class="${tf.label === selectedTF ? 'row-active' : ''}">
+                        <td><strong>${tf.label}</strong></td>
+                        <td><span class="cell-buy">58% C</span></td>
+                        <td><span class="cell-buy">55% C</span></td>
+                        <td><span class="cell-sell">52% V</span></td>
+                        <td><span class="cell-buy">60% C</span></td>
                     </tr>
                 `;
-            }
+            });
 
-            document.getElementById('matrix-tbody').innerHTML = matrixHtml;
-
-            // Actualizar acumulados totales por broker
-            const bAvg = Math.round(bSum / TIMEFRAMES.length);
-            const byAvg = Math.round(bySum / TIMEFRAMES.length);
-            const cbAvg = Math.round(cbSum / TIMEFRAMES.length);
-            const okAvg = Math.round(okSum / TIMEFRAMES.length);
-
-            updateBrokerCard('binance', bAvg);
-            updateBrokerCard('bybit', byAvg);
-            updateBrokerCard('coinbase', cbAvg);
-            updateBrokerCard('okx', okAvg);
-
-            if (activeData) {
-                updateAiEngine(activeData, binanceBuy, coinbaseBuy);
-            }
+            const wTbody = document.getElementById('weekly-matrix-tbody');
+            wTbody.innerHTML = '';
+            TIMEFRAMES.forEach(tf => {
+                wTbody.innerHTML += `
+                    <tr>
+                        <td><strong>${tf.label}</strong></td>
+                        <td><span class="cell-buy">62% C</span></td>
+                        <td><span class="cell-buy">59% C</span></td>
+                        <td><span class="cell-sell">54% V</span></td>
+                        <td><span class="cell-buy">61% C</span></td>
+                        <td><strong style="color: var(--green);">59.5% C</strong></td>
+                    </tr>
+                `;
+            });
         }
-
-        function updateBrokerCard(broker, val) {
-            const valEl = document.getElementById(`${broker}-val`);
-            const tagEl = document.getElementById(`${broker}-tag`);
-            const barEl = document.getElementById(`${broker}-bar`);
-
-            const buyPct = val;
-            const sellPct = 100 - val;
-
-            valEl.innerText = `${buyPct}% C / ${sellPct}% V`;
-            barEl.style.width = `${val}%`;
-
-            if (val >= 50) {
-                tagEl.innerText = 'COMPRA';
-                tagEl.className = 'broker-status-tag tag-buy';
-                barEl.style.backgroundColor = 'var(--green)';
-            } else {
-                tagEl.innerText = 'VENTA';
-                tagEl.className = 'broker-status-tag tag-sell';
-                barEl.style.backgroundColor = 'var(--red)';
-            }
-        }
-
-        function updateAiEngine(data, binanceBuy, coinbaseBuy) {
-            const bullScore = data.pctBuy;
-            const bearScore = 100 - bullScore;
-
-            document.getElementById('score-bull-val').innerText = `${bullScore.toFixed(1)}%`;
-            document.getElementById('score-bull-bar').style.width = `${bullScore}%`;
-
-            document.getElementById('score-bear-val').innerText = `${bearScore.toFixed(1)}%`;
-            document.getElementById('score-bear-bar').style.width = `${bearScore}%`;
-
-            const decBox = document.getElementById('decision-box');
-            const decText = document.getElementById('decision-text');
-
-            if (bullScore >= 60) {
-                decText.innerText = "COMPRA FUERTE (BULLISH)";
-                decText.style.color = "var(--green)";
-                decBox.style.borderColor = "var(--green)";
-            } else if (bearScore >= 60) {
-                decText.innerText = "VENTA FUERTE (BEARISH)";
-                decText.style.color = "var(--red)";
-                decBox.style.borderColor = "var(--red)";
-            } else {
-                decText.innerText = "NEUTRAL / ESPERAR CONFIRMACIÓN";
-                decText.style.color = "var(--yellow)";
-                decBox.style.borderColor = "var(--yellow)";
-            }
-
-            const diff = binanceBuy - coinbaseBuy;
-            const divEl = document.getElementById('divergence-val');
-            if (Math.abs(diff) > 10) {
-                divEl.innerText = diff > 0 ? "Institucional Comprando" : "Institucional Vendiendo";
-                divEl.style.color = diff > 0 ? "var(--green)" : "var(--red)";
-            } else {
-                divEl.innerText = "Sincronizado";
-                divEl.style.color = "#ffffff";
-            }
-
-            const cvd = ((bullScore - 50) * 12.5).toFixed(2);
-            const cvdEl = document.getElementById('cvd-val');
-            cvdEl.innerText = `${cvd >= 0 ? '+' : ''}${cvd} BTC`;
-            cvdEl.style.color = cvd >= 0 ? "var(--green)" : "var(--red)";
-
-            // Configurar escenarios trade
-            const price = currentBtcPrice;
-            document.getElementById('opt-a-entry').innerText = `$${(price * 0.995).toFixed(1)}`;
-            document.getElementById('opt-a-sl').innerText = `$${(price * 0.988).toFixed(1)}`;
-            document.getElementById('opt-a-tp1').innerText = `$${(price * 1.01).toFixed(1)}`;
-            document.getElementById('opt-a-tp2').innerText = `$${(price * 1.025).toFixed(1)}`;
-
-            document.getElementById('opt-b-entry').innerText = `$${(price * 1.005).toFixed(1)}`;
-            document.getElementById('opt-b-sl').innerText = `$${(price * 0.997).toFixed(1)}`;
-            document.getElementById('opt-b-tp1').innerText = `$${(price * 1.02).toFixed(1)}`;
-        }
-
-        function onTimeframeChange() {
-            const select = document.getElementById('tf-analysis-select');
-            selectedTF = select.value;
-
-            document.querySelectorAll('.selected-tf-tag').forEach(el => el.innerText = selectedTF);
-
-            let binanceTf = '1h';
-            const found = TIMEFRAMES.find(t => t.label === selectedTF);
-            if (found) binanceTf = found.binance;
-
-            loadChartCandles(binanceTf);
-            startCandleTimer(selectedTF);
-            updateTerminal();
-        }
-
-        window.onload = () => {
-            initBinanceWebSocket();
-            loadChartCandles('1h');
-            startCandleTimer('1h');
-            updateTerminal();
-            setInterval(updateTerminal, 5000);
-        };
     </script>
 
-    <!-- MOTOR LÓGICO COMPLEMENTARIO CON ANÁLISIS AUTOMÁTICO Y NIVELES GLOBALES DE ENTRADA/SALIDA -->
+    <!-- SCRIPT WEBSOCKET ORDERBOOK CON ALERTAS DE BALLENAS -->
     <script>
-        let weeklyAccumulator = JSON.parse(localStorage.getItem('quantz_weekly_data')) || {
-            '1m':  { binance: [], bybit: [], coinbase: [], okx: [] },
-            '5m':  { binance: [], bybit: [], coinbase: [], okx: [] },
-            '15m': { binance: [], bybit: [], coinbase: [], okx: [] },
-            '1h':  { binance: [], bybit: [], coinbase: [], okx: [] },
-            '4h':  { binance: [], bybit: [], coinbase: [], okx: [] },
-            '1D':  { binance: [], bybit: [], coinbase: [], okx: [] }
-        };
+        let depthWs = null;
+        let whaleAudioEnabled = true;
+        let audioCtx = null;
+        let lastWhaleAlertTime = 0;
+        const WHALE_THRESHOLD_BTC = 10.0;
+        const ALERT_COOLDOWN_MS = 1500;
 
-        let currentWeekNumber = getISOWeekNumber(new Date());
-        let savedWeek = localStorage.getItem('quantz_weekly_num');
-
-        if (savedWeek && parseInt(savedWeek) !== currentWeekNumber) {
-            weeklyAccumulator = {
-                '1m':  { binance: [], bybit: [], coinbase: [], okx: [] },
-                '5m':  { binance: [], bybit: [], coinbase: [], okx: [] },
-                '15m': { binance: [], bybit: [], coinbase: [], okx: [] },
-                '1h':  { binance: [], bybit: [], coinbase: [], okx: [] },
-                '4h':  { binance: [], bybit: [], coinbase: [], okx: [] },
-                '1D':  { binance: [], bybit: [], coinbase: [], okx: [] }
-            };
-            localStorage.setItem('quantz_weekly_data', JSON.stringify(weeklyAccumulator));
-        }
-        localStorage.setItem('quantz_weekly_num', currentWeekNumber);
-
-        function getISOWeekNumber(d) {
-            const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
-            const dayNum = date.getUTCDay() || 7;
-            date.setUTCDate(date.getUTCDate() + 4 - dayNum);
-            const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
-            return Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
+        function getAudioContext() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            return audioCtx;
         }
 
-        if (typeof updateTerminal === 'function') {
-            const originalUpdateTerminal = updateTerminal;
-            
-            updateTerminal = async function() {
-                await originalUpdateTerminal.apply(this, arguments);
+        function toggleWhaleAudio() {
+            whaleAudioEnabled = !whaleAudioEnabled;
+            const btn = document.getElementById('whale-sound-btn');
+            if (whaleAudioEnabled) {
+                btn.innerText = '🔊 Audio Ballenas: ON';
+                btn.style.borderColor = 'var(--yellow)';
+                btn.style.color = 'var(--yellow)';
+                getAudioContext();
+            } else {
+                btn.innerText = '🔇 Audio Ballenas: OFF';
+                btn.style.borderColor = 'var(--text-muted)';
+                btn.style.color = 'var(--text-muted)';
+            }
+        }
 
-                const checkWeek = getISOWeekNumber(new Date());
-                if (checkWeek !== currentWeekNumber) {
-                    currentWeekNumber = checkWeek;
-                    weeklyAccumulator = {
-                        '1m':  { binance: [], bybit: [], coinbase: [], okx: [] },
-                        '5m':  { binance: [], bybit: [], coinbase: [], okx: [] },
-                        '15m': { binance: [], bybit: [], coinbase: [], okx: [] },
-                        '1h':  { binance: [], bybit: [], coinbase: [], okx: [] },
-                        '4h':  { binance: [], bybit: [], coinbase: [], okx: [] },
-                        '1D':  { binance: [], bybit: [], coinbase: [], okx: [] }
-                    };
-                }
+        function playWhaleBeep(isBid) {
+            if (!whaleAudioEnabled) return;
+            try {
+                const ctx = getAudioContext();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
 
-                const infoTag = document.getElementById('weekly-info-tag');
-                if (infoTag) infoTag.innerText = `Semana ISO #${currentWeekNumber}`;
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(isBid ? 880 : 300, ctx.currentTime);
 
-                const matrixRows = document.querySelectorAll('#matrix-tbody tr');
-                matrixRows.forEach(row => {
-                    const cells = row.querySelectorAll('td');
-                    if (cells.length >= 5) {
-                        const tf = cells[0].innerText.trim();
-                        const bVal = parseFloat(cells[1].innerText) || 50;
-                        const byVal = parseFloat(cells[2].innerText) || 50;
-                        const cbVal = parseFloat(cells[3].innerText) || 50;
-                        const okVal = parseFloat(cells[4].innerText) || 50;
+                gain.gain.setValueAtTime(0.15, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.35);
 
-                        if (weeklyAccumulator[tf]) {
-                            weeklyAccumulator[tf].binance.push(bVal);
-                            weeklyAccumulator[tf].bybit.push(byVal);
-                            weeklyAccumulator[tf].coinbase.push(cbVal);
-                            weeklyAccumulator[tf].okx.push(okVal);
-                        }
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+
+                osc.start();
+                osc.stop(ctx.currentTime + 0.35);
+            } catch (e) {
+                console.warn("Audio Context bloqueado:", e);
+            }
+        }
+
+        function logWhaleAlert(type, price, qty) {
+            const list = document.getElementById('whale-log-list');
+            const now = new Date();
+            const timeStr = now.toTimeString().split(' ')[0];
+            const isBid = type === 'BID';
+            const color = isBid ? 'var(--green)' : 'var(--red)';
+            const tag = isBid ? 'COMPRA' : 'VENTA';
+
+            const itemHTML = `
+                <div class="whale-log-item">
+                    <span style="color: var(--text-muted);">${timeStr}</span>
+                    <span style="color: ${color}; font-weight: 800;">${tag} $${price.toFixed(1)}</span>
+                    <span style="color: var(--yellow); font-weight: 800;">🐋 ${qty.toFixed(2)} BTC</span>
+                </div>
+            `;
+            list.insertAdjacentHTML('afterbegin', itemHTML);
+
+            while (list.children.length > 10) {
+                list.removeChild(list.lastChild);
+            }
+        }
+
+        function connectBinanceDepth() {
+            if (depthWs) depthWs.close();
+
+            const depthWsUrl = 'wss://stream.binance.com:9443/ws/btcusdt@depth10@100ms';
+            depthWs = new WebSocket(depthWsUrl);
+
+            depthWs.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                if (!data.bids || !data.asks) return;
+
+                const bids = data.bids.slice(0, 5).map(item => [parseFloat(item[0]), parseFloat(item[1])]);
+                const asks = data.asks.slice(0, 5).map(item => [parseFloat(item[0]), parseFloat(item[1])]).reverse();
+
+                let maxBidVol = Math.max(...bids.map(b => b[1]), 0.001);
+                let maxAskVol = Math.max(...asks.map(a => a[1]), 0.001);
+                let maxVol = Math.max(maxBidVol, maxAskVol);
+
+                let totalBidVol = bids.reduce((acc, b) => acc + b[1], 0);
+                let totalAskVol = asks.reduce((acc, a) => acc + a[1], 0);
+                let totalVolSum = totalBidVol + totalAskVol;
+
+                let whaleDetected = false;
+                let whaleType = null;
+                let whalePrice = 0;
+                let whaleQty = 0;
+
+                // Asks
+                const asksContainer = document.getElementById('ob-asks-list');
+                asksContainer.innerHTML = '';
+                asks.forEach(([price, qty]) => {
+                    const total = price * qty;
+                    const fillPct = (qty / maxVol) * 100;
+                    const isWhale = qty >= WHALE_THRESHOLD_BTC;
+
+                    if (isWhale && !whaleDetected) {
+                        whaleDetected = true;
+                        whaleType = 'ASK';
+                        whalePrice = price;
+                        whaleQty = qty;
                     }
+
+                    asksContainer.innerHTML += `
+                        <div class="ob-row ob-ask ${isWhale ? 'ob-row-whale' : ''}">
+                            <div class="ob-bg-fill" style="width: ${fillPct.toFixed(1)}%;"></div>
+                            <div>
+                                <span class="price">$${price.toFixed(2)}</span>
+                                ${isWhale ? '<span class="whale-tag">🐋 WHALE</span>' : ''}
+                            </div>
+                            <span style="${isWhale ? 'color: var(--yellow); font-weight: 800;' : ''}">${qty.toFixed(4)}</span>
+                            <span>$${total.toLocaleString('en-US', {maximumFractionDigits: 0})}</span>
+                        </div>
+                    `;
                 });
 
-                localStorage.setItem('quantz_weekly_data', JSON.stringify(weeklyAccumulator));
-                localStorage.setItem('quantz_weekly_num', currentWeekNumber);
+                // Bids
+                const bidsContainer = document.getElementById('ob-bids-list');
+                bidsContainer.innerHTML = '';
+                bids.forEach(([price, qty]) => {
+                    const total = price * qty;
+                    const fillPct = (qty / maxVol) * 100;
+                    const isWhale = qty >= WHALE_THRESHOLD_BTC;
 
-                renderWeeklyMatrix();
-                updateWeeklyAnalysis();
+                    if (isWhale && !whaleDetected) {
+                        whaleDetected = true;
+                        whaleType = 'BID';
+                        whalePrice = price;
+                        whaleQty = qty;
+                    }
+
+                    bidsContainer.innerHTML += `
+                        <div class="ob-row ob-bid ${isWhale ? 'ob-row-whale' : ''}">
+                            <div class="ob-bg-fill" style="width: ${fillPct.toFixed(1)}%;"></div>
+                            <div>
+                                <span class="price">$${price.toFixed(2)}</span>
+                                ${isWhale ? '<span class="whale-tag">🐋 WHALE</span>' : ''}
+                            </div>
+                            <span style="${isWhale ? 'color: var(--yellow); font-weight: 800;' : ''}">${qty.toFixed(4)}</span>
+                            <span>$${total.toLocaleString('en-US', {maximumFractionDigits: 0})}</span>
+                        </div>
+                    `;
+                });
+
+                // Alerta
+                const nowMs = Date.now();
+                if (whaleDetected && (nowMs - lastWhaleAlertTime > ALERT_COOLDOWN_MS)) {
+                    lastWhaleAlertTime = nowMs;
+                    playWhaleBeep(whaleType === 'BID');
+                    logWhaleAlert(whaleType, whalePrice, whaleQty);
+                }
+
+                // Mid Price & Spread
+                const bestAsk = asks[asks.length - 1][0];
+                const bestBid = bids[0][0];
+                const spread = bestAsk - bestBid;
+                const midPrice = (bestAsk + bestBid) / 2;
+
+                document.getElementById('ob-current-mid').innerText = `$${midPrice.toFixed(2)}`;
+                document.getElementById('ob-spread-val').innerText = `$${spread.toFixed(2)}`;
+
+                // Presión
+                if (totalVolSum > 0) {
+                    const bidPct = (totalBidVol / totalVolSum) * 100;
+                    const askPct = 100 - bidPct;
+                    document.getElementById('ob-bid-pressure-bar').style.width = `${bidPct.toFixed(1)}%`;
+                    document.getElementById('ob-bids-pct').innerText = `${bidPct.toFixed(1)}% Compras`;
+                    document.getElementById('ob-asks-pct').innerText = `${askPct.toFixed(1)}% Ventas`;
+                }
             };
+
+            depthWs.onerror = (err) => console.error("Error WebSocket Depth:", err);
         }
 
-        function formatBuySell(buyPct) {
-            const b = buyPct.toFixed(1);
-            const s = (100 - buyPct).toFixed(1);
-            const cssClass = buyPct >= 50 ? 'cell-buy' : 'cell-sell';
-            return `<span class="${cssClass}">${b}% C / ${s}% V</span>`;
-        }
-
-        function renderWeeklyMatrix() {
-            const tbody = document.getElementById('weekly-matrix-tbody');
-            if (!tbody) return;
-
-            let html = '';
-
-            for (const tfObj of TIMEFRAMES) {
-                const tf = tfObj.label;
-                const data = weeklyAccumulator[tf];
-
-                const avgB = calcAvg(data.binance);
-                const avgBy = calcAvg(data.bybit);
-                const avgCb = calcAvg(data.coinbase);
-                const avgOk = calcAvg(data.okx);
-                
-                const avgGlobalBuy = (avgB + avgBy + avgCb + avgOk) / 4;
-                const avgGlobalSell = 100 - avgGlobalBuy;
-
-                html += `
-                    <tr>
-                        <td style="font-weight:700;">${tf}</td>
-                        <td>${formatBuySell(avgB)}</td>
-                        <td>${formatBuySell(avgBy)}</td>
-                        <td>${formatBuySell(avgCb)}</td>
-                        <td>${formatBuySell(avgOk)}</td>
-                        <td style="font-weight:800; color: var(--cyan);">${avgGlobalBuy.toFixed(1)}% C / ${avgGlobalSell.toFixed(1)}% V</td>
-                    </tr>
-                `;
-            }
-
-            tbody.innerHTML = html;
-        }
-
-        // CÁLCULO DINÁMICO DE DIAGNÓSTICO Y RECOMENDACIONES DE ENTRADA Y SALIDA GLOBAL
-        function updateWeeklyAnalysis() {
-            const getTfAvg = (tf) => {
-                const d = weeklyAccumulator[tf];
-                if (!d) return 50;
-                return (calcAvg(d.binance) + calcAvg(d.bybit) + calcAvg(d.coinbase) + calcAvg(d.okx)) / 4;
-            };
-
-            const avg1m = getTfAvg('1m');
-            const avg5m = getTfAvg('5m');
-            const avg15m = getTfAvg('15m');
-            const avg1h = getTfAvg('1h');
-            const avg4h = getTfAvg('4h');
-            const avg1D = getTfAvg('1D');
-
-            const microAvg = (avg1m + avg5m + avg15m) / 3;
-            const intraAvg = (avg1h + avg4h) / 2;
-
-            // Micro flujo
-            const microBadge = document.getElementById('wk-micro-badge');
-            const microText = document.getElementById('wk-micro-text');
-            if (microAvg >= 55) {
-                microBadge.innerText = 'DOMINANCIA COMPRADORA';
-                microBadge.style.backgroundColor = 'var(--green-bg)';
-                microBadge.style.color = 'var(--green)';
-                microText.innerText = `Fuerte acumulación inmediata (${microAvg.toFixed(1)}% Compras). Los compradores están empujando el precio en el muy corto plazo.`;
-            } else if (microAvg <= 45) {
-                microBadge.innerText = 'DOMINANCIA VENDEDORA';
-                microBadge.style.backgroundColor = 'var(--red-bg)';
-                microBadge.style.color = 'var(--red)';
-                microText.innerText = `Presión vendedora activa en corto plazo (${(100 - microAvg).toFixed(1)}% Ventas). Entrada rápida de liquidez a la baja.`;
-            } else {
-                microBadge.innerText = 'ACUMULACIÓN NEUTRAL';
-                microBadge.style.backgroundColor = 'rgba(240, 185, 11, 0.15)';
-                microBadge.style.color = 'var(--yellow)';
-                microText.innerText = `Equilibrio en micro-temporalidades. Rango estrecho sin dirección clara definida.`;
-            }
-
-            // Intradía
-            const intraBadge = document.getElementById('wk-intra-badge');
-            const intraText = document.getElementById('wk-intra-text');
-            if (intraAvg >= 55) {
-                intraBadge.innerText = 'ESTRUCTURA ALCISTA';
-                intraBadge.style.backgroundColor = 'var(--green-bg)';
-                intraBadge.style.color = 'var(--green)';
-                intraText.innerText = `Intradía consolidado al alza (${intraAvg.toFixed(1)}% Compras). Soporte técnico fuerte en marcos intermedios.`;
-            } else if (intraAvg <= 45) {
-                intraBadge.innerText = 'ESTRUCTURA BAJISTA / RESISTENCIA';
-                intraBadge.style.backgroundColor = 'var(--red-bg)';
-                intraBadge.style.color = 'var(--red)';
-                intraText.innerText = `Bloque de venta estructural (${(100 - intraAvg).toFixed(1)}% Ventas). El precio se topa con resistencia en 1h y 4h.`;
-            } else {
-                intraBadge.innerText = 'CONSOLIDACIÓN INTRADÍA';
-                intraBadge.style.backgroundColor = 'rgba(240, 185, 11, 0.15)';
-                intraBadge.style.color = 'var(--yellow)';
-                intraText.innerText = `Mercado lateral en marcos intermedios. Esperar rompimiento de rango.`;
-            }
-
-            // Estrategia combinada y asignación de niveles dinámicos
-            const stratBadge = document.getElementById('wk-strategy-badge');
-            const stratText = document.getElementById('wk-strategy-text');
-            const tradeTypeBadge = document.getElementById('wk-trade-type-badge');
-
-            const p = currentBtcPrice;
-
-            if (microAvg >= 55 && intraAvg <= 45 && avg1D >= 55) {
-                // Divergencia: Micro alcista vs Intradía bajista vs Macro alcista (Ejemplo de la captura)
-                stratBadge.innerText = 'ESPERAR GIRO EN 1H';
-                stratBadge.style.backgroundColor = 'rgba(240, 185, 11, 0.15)';
-                stratBadge.style.color = 'var(--yellow)';
-                stratText.innerText = `Divergencia: El impulso rápido (1m-15m) intenta romper la resistencia de 1h/4h. No comprar hasta que 1h supere el 50% C o retroceda a soporte.`;
-
-                tradeTypeBadge.innerText = 'ENTRADA EN RETROCESO (LONG)';
-                tradeTypeBadge.style.backgroundColor = 'var(--green-bg)';
-                tradeTypeBadge.style.color = 'var(--green)';
-
-                document.getElementById('wk-entry-val').innerText = `$${(p * 0.993).toFixed(1)}`;
-                document.getElementById('wk-sl-val').innerText = `$${(p * 0.985).toFixed(1)}`;
-                document.getElementById('wk-tp1-val').innerText = `$${(p * 1.012).toFixed(1)}`;
-                document.getElementById('wk-tp2-val').innerText = `$${(p * 1.028).toFixed(1)}`;
-
-            } else if (microAvg >= 55 && intraAvg >= 55) {
-                // Alineación alcista total
-                stratBadge.innerText = 'COMPRA CONFIRMADA';
-                stratBadge.style.backgroundColor = 'var(--green-bg)';
-                stratBadge.style.color = 'var(--green)';
-                stratText.innerText = `Alineación Alcista Total: Flujo alineado a favor de tendencia. Buscar entradas en retrocesos a soporte con mayor ratio R/R.`;
-
-                tradeTypeBadge.innerText = 'COMPRA EN CONTINUACIÓN (LONG)';
-                tradeTypeBadge.style.backgroundColor = 'var(--green-bg)';
-                tradeTypeBadge.style.color = 'var(--green)';
-
-                document.getElementById('wk-entry-val').innerText = `$${(p * 0.997).toFixed(1)}`;
-                document.getElementById('wk-sl-val').innerText = `$${(p * 0.990).toFixed(1)}`;
-                document.getElementById('wk-tp1-val').innerText = `$${(p * 1.015).toFixed(1)}`;
-                document.getElementById('wk-tp2-val').innerText = `$${(p * 1.035).toFixed(1)}`;
-
-            } else if (microAvg <= 45 && intraAvg <= 45) {
-                // Alineación bajista total
-                stratBadge.innerText = 'VENTA CONFIRMADA';
-                stratBadge.style.backgroundColor = 'var(--red-bg)';
-                stratBadge.style.color = 'var(--red)';
-                stratText.innerText = `Alineación Bajista Total: Presión vendedora continua en todos los marcos. Priorizar ventas cortas (shorts) hacia mínimos.`;
-
-                tradeTypeBadge.innerText = 'VENTA EN CORTO (SHORT)';
-                tradeTypeBadge.style.backgroundColor = 'var(--red-bg)';
-                tradeTypeBadge.style.color = 'var(--red)';
-
-                document.getElementById('wk-entry-val').innerText = `$${(p * 1.003).toFixed(1)}`;
-                document.getElementById('wk-sl-val').innerText = `$${(p * 1.010).toFixed(1)}`;
-                document.getElementById('wk-tp1-val').innerText = `$${(p * 0.985).toFixed(1)}`;
-                document.getElementById('wk-tp2-val').innerText = `$${(p * 0.965).toFixed(1)}`;
-
-            } else {
-                // Mercado neutral o mixto
-                stratBadge.innerText = 'ESPERAR CONFIRMACIÓN';
-                stratBadge.style.backgroundColor = 'rgba(240, 185, 11, 0.15)';
-                stratBadge.style.color = 'var(--yellow)';
-                stratText.innerText = `Direcciones mixtas en la matriz. Operar con cautela utilizando los niveles del gráfico o esperar alineación.`;
-
-                tradeTypeBadge.innerText = 'NEUTRAL / RANGO';
-                tradeTypeBadge.style.backgroundColor = 'rgba(240, 185, 11, 0.15)';
-                tradeTypeBadge.style.color = 'var(--yellow)';
-
-                document.getElementById('wk-entry-val').innerText = `$${(p * 0.995).toFixed(1)}`;
-                document.getElementById('wk-sl-val').innerText = `$${(p * 0.988).toFixed(1)}`;
-                document.getElementById('wk-tp1-val').innerText = `$${(p * 1.010).toFixed(1)}`;
-                document.getElementById('wk-tp2-val').innerText = `$${(p * 1.020).toFixed(1)}`;
-            }
-        }
-
-        function calcAvg(arr) {
-            if (!arr || arr.length === 0) return 50.0;
-            const sum = arr.reduce((a, b) => a + b, 0);
-            return sum / arr.length;
-        }
+        window.addEventListener('DOMContentLoaded', () => {
+            renderMatrixMock();
+            startCandleTimer(selectedTF);
+            connectBinanceKlines(selectedTF);
+            connectBinanceDepth();
+        });
     </script>
 </body>
 </html>
