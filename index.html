@@ -527,15 +527,11 @@
         let lastCandleTimestamp = 0;
 
         // ESTRUCTURA VWAP DE BALLENAS
-        let whaleBidsWeightedSum = 0;
-        let whaleBidsVolSum = 0;
-        let whaleAsksWeightedSum = 0;
-        let whaleAsksVolSum = 0;
         let currentWhaleVwap = 0;
 
         // MARCADORES Y SEÑALES VISUALES EN EL GRÁFICO (FLECHAS COMPRA/VENTA)
         let chartMarkers = [];
-        let lastSignalState = null; 
+        let lastSignalState = null; // 'BUY' o 'SELL'
 
         // INICIALIZACIÓN DE LIGHTWEIGHT CHARTS
         const chartContainer = document.getElementById('tv-chart');
@@ -552,6 +548,7 @@
 
         let klineWs = null;
 
+        // LIMPIAR LÍNEAS PROYECTADAS (TP Y SL)
         function clearProjectionLines() {
             projectionPriceLines.forEach(line => candlestickSeries.removePriceLine(line));
             projectionPriceLines = [];
@@ -575,22 +572,23 @@
             });
         }
 
-        // DIBUJAR FLECHA Y PROYECCIONES SI SE CONFIRMA TENDENCIA CON EL VWAP DE BALLENAS
+        // DIBUJAR FLECHA Y PROYECCIONES CON CORRECCIÓN DE NIVELES Y LIMPIEZA DE SOLAPAMIENTO
         function updateChartSignalMarker(signalType, price) {
             if (!lastCandleTimestamp) return;
 
-            // CONFIRMACIÓN VWAP: No emite compra si el precio está por debajo del VWAP de ballenas, ni venta si está por encima
-            if (signalType === 'BUY' && currentWhaleVwap > 0 && price < currentWhaleVwap) {
-                return; // Rechazar señal alcista falsa bajo la zona de venta ponderada de ballenas
-            }
-            if (signalType === 'SELL' && currentWhaleVwap > 0 && price > currentWhaleVwap) {
-                return; // Rechazar señal bajista falsa sobre la zona de compra ponderada de ballenas
-            }
+            // FILTRO VWAP: No permite señales contradictorias con respecto a la zona de masa institucional
+            if (signalType === 'BUY' && currentWhaleVwap > 0 && price < currentWhaleVwap) return;
+            if (signalType === 'SELL' && currentWhaleVwap > 0 && price > currentWhaleVwap) return;
 
             if (lastSignalState === signalType) return;
             lastSignalState = signalType;
 
             const isBuy = signalType === 'BUY';
+
+            // 1. OBLIGATORIO: LIMPIAR TODAS LAS LÍNEAS DE PROYECCIÓN ANTERIORES AL CAMBIAR DE SEÑAL
+            clearProjectionLines();
+
+            // 2. MANTENER ÚNICAMENTE EL MARCADOR DE LA SEÑAL ACTIVA EN PANTALLA
             const newMarker = {
                 time: lastCandleTimestamp,
                 position: isBuy ? 'belowBar' : 'aboveBar',
@@ -599,13 +597,12 @@
                 text: isBuy ? `COMPRA CONFIRMADA @ $${price.toFixed(1)}` : `VENTA CONFIRMADA @ $${price.toFixed(1)}`
             };
 
-            chartMarkers.push(newMarker);
-            if (chartMarkers.length > 15) chartMarkers.shift();
-
+            chartMarkers = [newMarker]; 
             candlestickSeries.setMarkers(chartMarkers);
 
-            clearProjectionLines();
-
+            // 3. RECALCULAR Y DIBUJAR NIVELES DE TP Y SL SEGÚN LA DIRECCIÓN REAL DE LA OPERACIÓN
+            // Para COMPRA: TP arriba (+1.5%), SL abajo (-0.8%)
+            // Para VENTA:  TP abajo (-1.5%), SL arriba (+0.8%)
             const targetTpPrice = isBuy ? price * 1.015 : price * 0.985;
             const targetSlPrice = isBuy ? price * 0.992 : price * 1.008;
 
