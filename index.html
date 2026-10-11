@@ -122,6 +122,15 @@
         .whale-log-box { margin-top: 10px; background: var(--bg-body); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; max-height: 120px; overflow-y: auto; font-size: 0.7rem; }
         .whale-log-item { display: flex; justify-content: space-between; padding: 2px 0; border-bottom: 1px dashed rgba(255,255,255,0.05); }
 
+        /* NUEVO PANEL DE ASESORÍA DE DECISIÓN COMPRAR / VENDER */
+        .decision-advisor-card { background: linear-gradient(135deg, rgba(21, 25, 36, 0.98), rgba(15, 18, 26, 0.98)); border: 1px solid var(--yellow); border-radius: 8px; padding: 12px; margin-bottom: 15px; }
+        .advisor-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 6px; margin-bottom: 8px; }
+        .advisor-title { font-size: 0.75rem; color: var(--yellow); font-weight: 800; text-transform: uppercase; }
+        .advisor-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .advisor-item { background: var(--bg-body); padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); text-align: center; }
+        .advisor-label { font-size: 0.65rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; }
+        .advisor-val { font-size: 0.85rem; font-weight: 900; margin-top: 2px; }
+
         /* HISTÓRICO DE ACUMULACIÓN DE BALLENAS (INDEXEDDB) */
         .whale-history-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; background: var(--bg-body); padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); text-align: center; }
         .wh-stat-title { font-size: 0.65rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; }
@@ -394,6 +403,27 @@
                 </select>
             </div>
             <div class="panel-body">
+
+                <!-- NUEVO TARJETÓN DE ASESORÍA COMPRAR vs VENDER -->
+                <div class="decision-advisor-card">
+                    <div class="advisor-header">
+                        <span class="advisor-title">🎯 ASESOR DE DECISIÓN DE COMPRA / VENTA (NET DELTA FILTER)</span>
+                        <span style="font-size: 0.65rem; color: var(--cyan); font-weight: bold;">LIVE EVALUATION</span>
+                    </div>
+                    <div class="advisor-grid">
+                        <div class="advisor-item">
+                            <div class="advisor-label">Estado Op. COMPRA (LONG)</div>
+                            <div class="advisor-val" id="adv-buy-status" style="color: var(--red);">INVALIDADO 🔴</div>
+                        </div>
+                        <div class="advisor-item">
+                            <div class="advisor-label">Estado Op. VENTA (SHORT)</div>
+                            <div class="advisor-val" id="adv-sell-status" style="color: var(--green);">CONFIRMADO 🟢</div>
+                        </div>
+                    </div>
+                    <div style="margin-top: 8px; font-size: 0.72rem; text-align: center; color: var(--text-muted);" id="adv-summary-note">
+                        Evaluando balance institucional...
+                    </div>
+                </div>
 
                 <!-- SCORE IA -->
                 <div class="ai-overview">
@@ -895,13 +925,12 @@
         }
     </script>
 
-    <!-- SCRIPT DE INDEXEDDB PARA ALMACENAMIENTO ILIMITADO DE BALLENAS Y LÓGICA DE TIEMPO -->
+    <!-- SCRIPT INDEXEDDB Y MOTOR DE DECISIÓN DE COMPRA / VENTA INTEGRADO -->
     <script>
         let db = null;
         const DB_NAME = 'QuantzWhaleDB';
         const STORE_NAME = 'whale_events';
 
-        // Inicializar IndexedDB
         function initDB() {
             return new Promise((resolve, reject) => {
                 const request = indexedDB.open(DB_NAME, 1);
@@ -920,7 +949,6 @@
             });
         }
 
-        // Guardar orden de ballena en IndexedDB
         function saveWhaleToDB(record) {
             if (!db) return;
             const transaction = db.transaction([STORE_NAME], 'readwrite');
@@ -928,7 +956,6 @@
             store.add(record);
         }
 
-        // Obtener todos los registros guardados en IndexedDB
         function getAllWhalesFromDB() {
             return new Promise((resolve) => {
                 if (!db) return resolve([]);
@@ -940,7 +967,6 @@
             });
         }
 
-        // Limpiar completamente la Base de Datos
         function clearWhaleDatabase() {
             if (!db) return;
             const transaction = db.transaction([STORE_NAME], 'readwrite');
@@ -1007,7 +1033,7 @@
             }
         }
 
-        // MOSTRAR Y RENDERIZAR HISTÓRICO CON FILTRO DE TIEMPO
+        // MOSTRAR Y RENDERIZAR HISTÓRICO Y EVALUAR LA MATRIZ ASESORA DE COMPRA / VENTA
         async function renderWhaleHistoryUI() {
             const records = await getAllWhalesFromDB();
             cachedWhaleHistory = records;
@@ -1064,6 +1090,31 @@
             } else {
                 deltaEl.style.color = 'var(--red)';
                 cvdMetricEl.style.color = 'var(--red)';
+            }
+
+            // ACTUALIZAR MÓDULO ASESOR DE COMPRA/VENTA SEGÚN EL NET DELTA
+            const buyStatusEl = document.getElementById('adv-buy-status');
+            const sellStatusEl = document.getElementById('adv-sell-status');
+            const summaryNoteEl = document.getElementById('adv-summary-note');
+
+            if (netDelta < -10.0) {
+                buyStatusEl.innerText = 'INVALIDADO 🔴';
+                buyStatusEl.style.color = 'var(--red)';
+                sellStatusEl.innerText = 'CONFIRMADO 🟢';
+                sellStatusEl.style.color = 'var(--green)';
+                summaryNoteEl.innerText = `⚠️ ALERTA DE ABSORCIÓN: Net Delta de ${netDelta.toFixed(1)} BTC indica descarga institucionales. Evitar Longs.`;
+            } else if (netDelta > 10.0) {
+                buyStatusEl.innerText = 'CONFIRMADO 🟢';
+                buyStatusEl.style.color = 'var(--green)';
+                sellStatusEl.innerText = 'INVALIDADO 🔴';
+                sellStatusEl.style.color = 'var(--red)';
+                summaryNoteEl.innerText = `🚀 ACUMULACIÓN DETECTADA: Net Delta de +${netDelta.toFixed(1)} BTC respalda posiciones de Compra.`;
+            } else {
+                buyStatusEl.innerText = 'ESPERAR / NEUTRAL 🟡';
+                buyStatusEl.style.color = 'var(--yellow)';
+                sellStatusEl.innerText = 'ESPERAR / NEUTRAL 🟡';
+                sellStatusEl.style.color = 'var(--yellow)';
+                summaryNoteEl.innerText = `⚖️ MERCADO NEUTRAL: Volumen en equilibrio. Esperar confirmación del Smart Money.`;
             }
         }
 
