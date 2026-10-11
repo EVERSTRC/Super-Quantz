@@ -119,8 +119,13 @@
         .ob-pressure-bar-fill { height: 100%; background-color: var(--green); transition: width 0.2s ease; }
         .ob-pressure-labels { display: flex; justify-content: space-between; font-size: 0.68rem; font-weight: 700; margin-top: 4px; }
 
-        .whale-log-box { margin-top: 10px; background: var(--bg-body); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; max-height: 85px; overflow-y: auto; font-size: 0.7rem; }
+        .whale-log-box { margin-top: 10px; background: var(--bg-body); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; max-height: 110px; overflow-y: auto; font-size: 0.7rem; }
         .whale-log-item { display: flex; justify-content: space-between; padding: 2px 0; border-bottom: 1px dashed rgba(255,255,255,0.05); }
+
+        /* HISTÓRICO DE ACUMULACIÓN DE BALLENAS */
+        .whale-history-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; background: var(--bg-body); padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); text-align: center; }
+        .wh-stat-title { font-size: 0.65rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; }
+        .wh-stat-val { font-size: 0.85rem; font-weight: 800; font-family: 'Roboto Mono', monospace; }
 
         /* TABLAS Y TARJETAS */
         .pro-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; text-align: center; }
@@ -245,12 +250,12 @@
                 </div>
             </section>
 
-            <!-- ORDER BOOK & DEPTH CON ALERTAS DE BALLENAS -->
+            <!-- ORDER BOOK & HISTÓRICO DE ACUMULACIÓN DE BALLENAS -->
             <section class="panel" id="orderbook-panel">
                 <div class="panel-header">
                     <div style="display: flex; align-items: center; gap: 8px;">
-                        <span class="panel-title">📖 Libro de Órdenes & Profundidad (Binance Spot)</span>
-                        <span style="font-size: 0.72rem; color: var(--cyan); font-weight: 700;">100ms Live Feed</span>
+                        <span class="panel-title">📖 Libro de Órdenes & Histórico de Ballenas (&ge; 10 BTC)</span>
+                        <span style="font-size: 0.72rem; color: var(--cyan); font-weight: 700;">Live Feed + Persistence</span>
                     </div>
                     <button id="whale-sound-btn" class="btn-line" onclick="toggleWhaleAudio()" style="border-color: var(--yellow); color: var(--yellow);">
                         🔊 Audio Ballenas: ON
@@ -283,8 +288,28 @@
                             </div>
                         </div>
 
+                        <!-- RESUMEN ACUMULADO DEL HISTÓRICO DE BALLENAS -->
+                        <div class="whale-history-summary">
+                            <div>
+                                <div class="wh-stat-title">Vol. Compras Ballena</div>
+                                <div class="wh-stat-val" id="wh-hist-buy-vol" style="color: var(--green);">0.00 BTC</div>
+                            </div>
+                            <div>
+                                <div class="wh-stat-title">Vol. Ventas Ballena</div>
+                                <div class="wh-stat-val" id="wh-hist-sell-vol" style="color: var(--red);">0.00 BTC</div>
+                            </div>
+                            <div>
+                                <div class="wh-stat-title">Net Delta CVD Ballenas</div>
+                                <div class="wh-stat-val" id="wh-hist-delta-val" style="color: var(--yellow);">0.00 BTC</div>
+                            </div>
+                        </div>
+
+                        <!-- REGISTRO HISTÓRICO EN VIVO CON PERSISTENCIA -->
                         <div class="whale-log-box" id="whale-log-container">
-                            <div style="color: var(--text-muted); font-size: 0.65rem; font-weight: 700; margin-bottom: 4px;">📡 ALERTA DE BALLENAS (&ge; 10 BTC):</div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                                <span style="color: var(--text-muted); font-size: 0.65rem; font-weight: 700;">📜 HISTÓRICO PERSISTENTE DE BALLENAS:</span>
+                                <button onclick="clearWhaleHistory()" style="background: transparent; border: none; color: var(--red); font-size: 0.65rem; cursor: pointer; font-weight: bold;">🗑️ Limpiar Histórico</button>
+                            </div>
                             <div id="whale-log-list"></div>
                         </div>
                     </div>
@@ -388,7 +413,7 @@
                         <div class="val" id="divergence-val" style="color: #ffffff;">Sincronizado</div>
                     </div>
                     <div class="metric-card">
-                        <div class="lbl">Net Delta CVD (Flujo)</div>
+                        <div class="lbl">Net Delta CVD (Flujo Ballenas)</div>
                         <div class="val" id="cvd-val" style="color: var(--green);">+0.00 BTC</div>
                     </div>
                     <div class="metric-card">
@@ -526,10 +551,9 @@
         let timerInterval = null;
         let lastCandleTimestamp = 0;
 
-        // ESTRUCTURA VWAP DE BALLENAS Y FLUJO INSTANTÁNEO EN VIVO
+        // ESTRUCTURA DE HISTÓRICO Y PERSISTENCIA DE BALLENAS (LOCALSTORAGE)
+        let whaleHistoryData = JSON.parse(localStorage.getItem('quantz_whale_history')) || [];
         let currentWhaleVwap = 0;
-        let recentWhaleBuyCount = 0;
-        let recentWhaleSellCount = 0;
 
         // MARCADORES Y SEÑALES VISUALES EN EL GRÁFICO (FLECHAS COMPRA/VENTA)
         let chartMarkers = [];
@@ -555,7 +579,6 @@
             projectionPriceLines = [];
         }
 
-        // DIBUJAR O ACTUALIZAR LA LÍNEA PONDERADA VWAP DE BALLENAS EN EL GRÁFICO
         function updateWhaleVwapLine(vwapPrice) {
             if (!vwapPrice || isNaN(vwapPrice) || vwapPrice <= 0) return;
 
@@ -573,19 +596,20 @@
             });
         }
 
-        // DIBUJAR FLECHA Y PROYECCIONES: FILTRADO ESTRICTO CON FLUJO EN VIVO DE BALLENAS
+        // DIBUJAR FLECHA Y PROYECCIONES: FILTRADO ESTRICTO BASADO EN EL HISTÓRICO PERSISTENTE
         function updateChartSignalMarker(signalType, price) {
             if (!lastCandleTimestamp) return;
 
-            // 1. FILTRO VWAP INSTITUCIONAL
+            // Calcular Net Delta del Histórico
+            const buyVol = whaleHistoryData.filter(d => d.type === 'BID').reduce((acc, d) => acc + d.qty, 0);
+            const sellVol = whaleHistoryData.filter(d => d.type === 'ASK').reduce((acc, d) => acc + d.qty, 0);
+
+            // Filtros cuantitativos con el histórico
             if (signalType === 'BUY' && currentWhaleVwap > 0 && price < currentWhaleVwap) return;
             if (signalType === 'SELL' && currentWhaleVwap > 0 && price > currentWhaleVwap) return;
 
-            // 2. NUEVO FILTRO DE FLUJO EN VIVO DE BALLENAS (>= 10 BTC)
-            // Si la señal es de COMPRA pero hay más ventas gigantes recientes, la anula.
-            if (signalType === 'BUY' && recentWhaleSellCount > recentWhaleBuyCount) return;
-            // Si la señal es de VENTA pero hay más compras gigantes recientes, la anula.
-            if (signalType === 'SELL' && recentWhaleBuyCount > recentWhaleSellCount) return;
+            if (signalType === 'BUY' && sellVol > buyVol) return;
+            if (signalType === 'SELL' && buyVol > sellVol) return;
 
             if (lastSignalState === signalType) return;
             lastSignalState = signalType;
@@ -629,7 +653,7 @@
             projectionPriceLines.push(tpLine, slLine);
         }
 
-        // CARGAR HISTÓRICO REST BINANCE DE 100 VELAS
+        // CARGAR HISTÓRICO REST BINANCE
         async function loadHistoricalKlines(tf) {
             const interval = TIMEFRAMES.find(t => t.label === tf)?.binance || '15m';
             const url = `https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${interval}&limit=100`;
@@ -655,7 +679,6 @@
             }
         }
 
-        // LÓGICA TIMER CIERRE VELA
         function getIntervalSeconds(tf) {
             if (tf === '1m') return 60;
             if (tf === '5m') return 300;
@@ -696,7 +719,6 @@
             timerInterval = setInterval(updateTimer, 1000);
         }
 
-        // HERRAMIENTAS MANUALES
         function setCurrentPriceInput() {
             document.getElementById('manual-price-input').value = currentBtcPrice.toFixed(1);
         }
@@ -745,7 +767,6 @@
             updateDynamicCalculations();
         }
 
-        // WEBSOCKET BINANCE SPOT KLINES
         function connectBinanceKlines(tf) {
             if (klineWs) klineWs.close();
 
@@ -801,7 +822,6 @@
             };
         }
 
-        // CÁLCULOS DINÁMICOS DE NIVELES IA
         function updateDynamicCalculations() {
             if (!currentBtcPrice) return;
 
@@ -823,7 +843,6 @@
             document.getElementById('wk-tp2-val').innerText = `$${res.toFixed(1)}`;
         }
 
-        // POBLAR MATRICES Y POBLADO DE DIAGNÓSTICO
         function renderMatrixMock() {
             const tbody = document.getElementById('matrix-tbody');
             tbody.innerHTML = '';
@@ -872,7 +891,7 @@
         }
     </script>
 
-    <!-- SCRIPT WEBSOCKET ORDERBOOK CON ALERTAS DE BALLENAS Y MOTOR DE SCORE IA -->
+    <!-- SCRIPT MÓDULO DE HISTÓRICO PERSISTENTE Y WEBSOCKET DE PROFUNDIDAD -->
     <script>
         let depthWs = null;
         let whaleAudioEnabled = true;
@@ -929,36 +948,82 @@
             }
         }
 
-        function logWhaleAlert(type, price, qty) {
+        // MOSTRAR Y RENDERIZAR HISTÓRICO EN LA INTERFAZ
+        function renderWhaleHistoryUI() {
             const list = document.getElementById('whale-log-list');
-            const now = new Date();
-            const timeStr = now.toTimeString().split(' ')[0];
-            const isBid = type === 'BID';
-            const color = isBid ? 'var(--green)' : 'var(--red)';
-            const tag = isBid ? 'COMPRA' : 'VENTA';
+            list.innerHTML = '';
 
-            // Incrementar contadores en vivo de ballenas
-            if (isBid) {
-                recentWhaleBuyCount++;
+            let totalBuyVol = 0;
+            let totalSellVol = 0;
+
+            whaleHistoryData.forEach(item => {
+                const isBid = item.type === 'BID';
+                if (isBid) totalBuyVol += item.qty;
+                else totalSellVol += item.qty;
+
+                const color = isBid ? 'var(--green)' : 'var(--red)';
+                const tag = isBid ? 'COMPRA' : 'VENTA';
+
+                const itemHTML = `
+                    <div class="whale-log-item">
+                        <span style="color: var(--text-muted);">${item.time}</span>
+                        <span style="color: ${color}; font-weight: 800;">${tag} $${item.price.toFixed(1)}</span>
+                        <span style="color: var(--yellow); font-weight: 800;">🐋 ${item.qty.toFixed(2)} BTC</span>
+                    </div>
+                `;
+                list.insertAdjacentHTML('afterbegin', itemHTML);
+            });
+
+            const netDelta = totalBuyVol - totalSellVol;
+
+            document.getElementById('wh-hist-buy-vol').innerText = `${totalBuyVol.toFixed(2)} BTC`;
+            document.getElementById('wh-hist-sell-vol').innerText = `${totalSellVol.toFixed(2)} BTC`;
+            
+            const deltaEl = document.getElementById('wh-hist-delta-val');
+            const cvdMetricEl = document.getElementById('cvd-val');
+
+            const deltaText = `${netDelta >= 0 ? '+' : ''}${netDelta.toFixed(2)} BTC`;
+            deltaEl.innerText = deltaText;
+            cvdMetricEl.innerText = deltaText;
+
+            if (netDelta >= 0) {
+                deltaEl.style.color = 'var(--green)';
+                cvdMetricEl.style.color = 'var(--green)';
             } else {
-                recentWhaleSellCount++;
-            }
-
-            const itemHTML = `
-                <div class="whale-log-item">
-                    <span style="color: var(--text-muted);">${timeStr}</span>
-                    <span style="color: ${color}; font-weight: 800;">${tag} $${price.toFixed(1)}</span>
-                    <span style="color: var(--yellow); font-weight: 800;">🐋 ${qty.toFixed(2)} BTC</span>
-                </div>
-            `;
-            list.insertAdjacentHTML('afterbegin', itemHTML);
-
-            while (list.children.length > 10) {
-                list.removeChild(list.lastChild);
+                deltaEl.style.color = 'var(--red)';
+                cvdMetricEl.style.color = 'var(--red)';
             }
         }
 
-        // EVALUACIÓN DE SCORE IA E INTEGRACIÓN DIRECTA CON FLUJO EN VIVO Y MARCADORES DEL GRÁFICO
+        function logWhaleAlert(type, price, qty) {
+            const now = new Date();
+            const timeStr = now.toTimeString().split(' ')[0];
+
+            const newRecord = {
+                timestamp: Date.now(),
+                time: timeStr,
+                type: type,
+                price: price,
+                qty: qty
+            };
+
+            whaleHistoryData.push(newRecord);
+
+            // Guardar máximo 100 registros en el LocalStorage
+            if (whaleHistoryData.length > 100) {
+                whaleHistoryData.shift();
+            }
+
+            localStorage.setItem('quantz_whale_history', JSON.stringify(whaleHistoryData));
+            renderWhaleHistoryUI();
+        }
+
+        function clearWhaleHistory() {
+            whaleHistoryData = [];
+            localStorage.removeItem('quantz_whale_history');
+            renderWhaleHistoryUI();
+        }
+
         function updateAIScore(bidPct, askPct) {
             const bullVal = document.getElementById('score-bull-val');
             const bullBar = document.getElementById('score-bull-bar');
@@ -976,12 +1041,14 @@
                 bearVal.innerText = `${finalBear.toFixed(1)}%`;
                 bearBar.style.width = `${finalBear.toFixed(1)}%`;
 
-                // EVALUACIÓN INTEGRADA CON EL FLUJO EN VIVO DE LAS BALLENAS
-                if (finalBull >= 60.0 && recentWhaleBuyCount >= recentWhaleSellCount) {
+                const buyVol = whaleHistoryData.filter(d => d.type === 'BID').reduce((acc, d) => acc + d.qty, 0);
+                const sellVol = whaleHistoryData.filter(d => d.type === 'ASK').reduce((acc, d) => acc + d.qty, 0);
+
+                if (finalBull >= 60.0 && buyVol >= sellVol) {
                     decisionText.innerText = 'ACUMULACIÓN ALCISTA CONFIRMADA';
                     decisionText.style.color = 'var(--green)';
                     updateChartSignalMarker('BUY', currentBtcPrice);
-                } else if (finalBear >= 60.0 && recentWhaleSellCount >= recentWhaleBuyCount) {
+                } else if (finalBear >= 60.0 && sellVol >= buyVol) {
                     decisionText.innerText = 'PRESIÓN VENDEDORA CONFIRMADA';
                     decisionText.style.color = 'var(--red)';
                     updateChartSignalMarker('SELL', currentBtcPrice);
@@ -1089,14 +1156,12 @@
                     `;
                 });
 
-                // RECALCULO DE VWAP PONDERADO TOTAL
                 const totalWhaleVol = currentWhaleBidsVol + currentWhaleAsksVol;
                 if (totalWhaleVol > 0) {
                     currentWhaleVwap = (currentWhaleBidsWeighted + currentWhaleAsksWeighted) / totalWhaleVol;
                     updateWhaleVwapLine(currentWhaleVwap);
                 }
 
-                // Alertas de Ballenas
                 const nowMs = Date.now();
                 if (whaleDetected && (nowMs - lastWhaleAlertTime > ALERT_COOLDOWN_MS)) {
                     lastWhaleAlertTime = nowMs;
@@ -1104,7 +1169,6 @@
                     logWhaleAlert(whaleType, whalePrice, whaleQty);
                 }
 
-                // Mid Price & Spread
                 const bestAsk = asks[asks.length - 1][0];
                 const bestBid = bids[0][0];
                 const spread = bestAsk - bestBid;
@@ -1113,7 +1177,6 @@
                 document.getElementById('ob-current-mid').innerText = `$${midPrice.toFixed(2)}`;
                 document.getElementById('ob-spread-val').innerText = `$${spread.toFixed(2)}`;
 
-                // Presión y Actualización de Decisión IA
                 if (totalVolSum > 0) {
                     const bidPct = (totalBidVol / totalVolSum) * 100;
                     const askPct = 100 - bidPct;
@@ -1130,6 +1193,7 @@
 
         window.addEventListener('DOMContentLoaded', async () => {
             renderMatrixMock();
+            renderWhaleHistoryUI();
             startCandleTimer(selectedTF);
             await loadHistoricalKlines(selectedTF);
             connectBinanceKlines(selectedTF);
