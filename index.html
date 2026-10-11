@@ -119,10 +119,10 @@
         .ob-pressure-bar-fill { height: 100%; background-color: var(--green); transition: width 0.2s ease; }
         .ob-pressure-labels { display: flex; justify-content: space-between; font-size: 0.68rem; font-weight: 700; margin-top: 4px; }
 
-        .whale-log-box { margin-top: 10px; background: var(--bg-body); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; max-height: 110px; overflow-y: auto; font-size: 0.7rem; }
+        .whale-log-box { margin-top: 10px; background: var(--bg-body); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; max-height: 120px; overflow-y: auto; font-size: 0.7rem; }
         .whale-log-item { display: flex; justify-content: space-between; padding: 2px 0; border-bottom: 1px dashed rgba(255,255,255,0.05); }
 
-        /* HISTÓRICO DE ACUMULACIÓN DE BALLENAS */
+        /* HISTÓRICO DE ACUMULACIÓN DE BALLENAS (INDEXEDDB) */
         .whale-history-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; background: var(--bg-body); padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); text-align: center; }
         .wh-stat-title { font-size: 0.65rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; }
         .wh-stat-val { font-size: 0.85rem; font-weight: 800; font-family: 'Roboto Mono', monospace; }
@@ -250,12 +250,12 @@
                 </div>
             </section>
 
-            <!-- ORDER BOOK & HISTÓRICO DE ACUMULACIÓN DE BALLENAS -->
+            <!-- ORDER BOOK & BASE DE DATOS PERSISTENTE INDEXEDDB -->
             <section class="panel" id="orderbook-panel">
                 <div class="panel-header">
                     <div style="display: flex; align-items: center; gap: 8px;">
-                        <span class="panel-title">📖 Libro de Órdenes & Histórico de Ballenas (&ge; 10 BTC)</span>
-                        <span style="font-size: 0.72rem; color: var(--cyan); font-weight: 700;">Live Feed + Persistence</span>
+                        <span class="panel-title">📖 Libro de Órdenes & Base de Datos IndexedDB (&ge; 10 BTC)</span>
+                        <span style="font-size: 0.72rem; color: var(--cyan); font-weight: 700;">Unlimited Persistence</span>
                     </div>
                     <button id="whale-sound-btn" class="btn-line" onclick="toggleWhaleAudio()" style="border-color: var(--yellow); color: var(--yellow);">
                         🔊 Audio Ballenas: ON
@@ -288,7 +288,16 @@
                             </div>
                         </div>
 
-                        <!-- RESUMEN ACUMULADO DEL HISTÓRICO DE BALLENAS -->
+                        <!-- RESUMEN ACUMULADO DEL HISTÓRICO CON FILTROS DE TIEMPO -->
+                        <div style="margin-top: 10px; display: flex; justify-content: space-between; align-items: center;">
+                            <span style="color: var(--text-muted); font-size: 0.68rem; font-weight: 700;">FILTRO HISTÓRICO BALLENAS:</span>
+                            <select id="time-filter-select" onchange="renderWhaleHistoryUI()" style="background: var(--bg-body); color: var(--cyan); border: 1px solid var(--border-color); padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; outline: none;">
+                                <option value="all" selected>Histórico Completo</option>
+                                <option value="24h">Últimas 24 Horas</option>
+                                <option value="1h">Última 1 Hora</option>
+                            </select>
+                        </div>
+
                         <div class="whale-history-summary">
                             <div>
                                 <div class="wh-stat-title">Vol. Compras Ballena</div>
@@ -304,11 +313,11 @@
                             </div>
                         </div>
 
-                        <!-- REGISTRO HISTÓRICO EN VIVO CON PERSISTENCIA -->
+                        <!-- REGISTRO HISTÓRICO PERSISTENTE INDEXEDDB -->
                         <div class="whale-log-box" id="whale-log-container">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                                <span style="color: var(--text-muted); font-size: 0.65rem; font-weight: 700;">📜 HISTÓRICO PERSISTENTE DE BALLENAS:</span>
-                                <button onclick="clearWhaleHistory()" style="background: transparent; border: none; color: var(--red); font-size: 0.65rem; cursor: pointer; font-weight: bold;">🗑️ Limpiar Histórico</button>
+                                <span style="color: var(--text-muted); font-size: 0.65rem; font-weight: 700;">📜 REGISTROS EN BASE DE DATOS LOCAL:</span>
+                                <button onclick="clearWhaleDatabase()" style="background: transparent; border: none; color: var(--red); font-size: 0.65rem; cursor: pointer; font-weight: bold;">🗑️ Borrar BD Persistente</button>
                             </div>
                             <div id="whale-log-list"></div>
                         </div>
@@ -551,9 +560,8 @@
         let timerInterval = null;
         let lastCandleTimestamp = 0;
 
-        // ESTRUCTURA DE HISTÓRICO Y PERSISTENCIA DE BALLENAS (LOCALSTORAGE)
-        let whaleHistoryData = JSON.parse(localStorage.getItem('quantz_whale_history')) || [];
         let currentWhaleVwap = 0;
+        let cachedWhaleHistory = [];
 
         // MARCADORES Y SEÑALES VISUALES EN EL GRÁFICO (FLECHAS COMPRA/VENTA)
         let chartMarkers = [];
@@ -596,15 +604,12 @@
             });
         }
 
-        // DIBUJAR FLECHA Y PROYECCIONES: FILTRADO ESTRICTO BASADO EN EL HISTÓRICO PERSISTENTE
         function updateChartSignalMarker(signalType, price) {
             if (!lastCandleTimestamp) return;
 
-            // Calcular Net Delta del Histórico
-            const buyVol = whaleHistoryData.filter(d => d.type === 'BID').reduce((acc, d) => acc + d.qty, 0);
-            const sellVol = whaleHistoryData.filter(d => d.type === 'ASK').reduce((acc, d) => acc + d.qty, 0);
+            const buyVol = cachedWhaleHistory.filter(d => d.type === 'BID').reduce((acc, d) => acc + d.qty, 0);
+            const sellVol = cachedWhaleHistory.filter(d => d.type === 'ASK').reduce((acc, d) => acc + d.qty, 0);
 
-            // Filtros cuantitativos con el histórico
             if (signalType === 'BUY' && currentWhaleVwap > 0 && price < currentWhaleVwap) return;
             if (signalType === 'SELL' && currentWhaleVwap > 0 && price > currentWhaleVwap) return;
 
@@ -653,7 +658,6 @@
             projectionPriceLines.push(tpLine, slLine);
         }
 
-        // CARGAR HISTÓRICO REST BINANCE
         async function loadHistoricalKlines(tf) {
             const interval = TIMEFRAMES.find(t => t.label === tf)?.binance || '15m';
             const url = `https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${interval}&limit=100`;
@@ -891,8 +895,63 @@
         }
     </script>
 
-    <!-- SCRIPT MÓDULO DE HISTÓRICO PERSISTENTE Y WEBSOCKET DE PROFUNDIDAD -->
+    <!-- SCRIPT DE INDEXEDDB PARA ALMACENAMIENTO ILIMITADO DE BALLENAS Y LÓGICA DE TIEMPO -->
     <script>
+        let db = null;
+        const DB_NAME = 'QuantzWhaleDB';
+        const STORE_NAME = 'whale_events';
+
+        // Inicializar IndexedDB
+        function initDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, 1);
+                request.onupgradeneeded = (e) => {
+                    const db = e.target.result;
+                    if (!db.objectStoreNames.contains(STORE_NAME)) {
+                        const store = db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
+                        store.createIndex('timestamp', 'timestamp', { unique: false });
+                    }
+                };
+                request.onsuccess = (e) => {
+                    db = e.target.result;
+                    resolve(db);
+                };
+                request.onerror = (e) => reject(e);
+            });
+        }
+
+        // Guardar orden de ballena en IndexedDB
+        function saveWhaleToDB(record) {
+            if (!db) return;
+            const transaction = db.transaction([STORE_NAME], 'readwrite');
+            const store = transaction.objectStore(STORE_NAME);
+            store.add(record);
+        }
+
+        // Obtener todos los registros guardados en IndexedDB
+        function getAllWhalesFromDB() {
+            return new Promise((resolve) => {
+                if (!db) return resolve([]);
+                const transaction = db.transaction([STORE_NAME], 'readonly');
+                const store = transaction.objectStore(STORE_NAME);
+                const request = store.getAll();
+                request.onsuccess = () => resolve(request.result || []);
+                request.onerror = () => resolve([]);
+            });
+        }
+
+        // Limpiar completamente la Base de Datos
+        function clearWhaleDatabase() {
+            if (!db) return;
+            const transaction = db.transaction([STORE_NAME], 'readwrite');
+            const store = transaction.objectStore(STORE_NAME);
+            const request = store.clear();
+            request.onsuccess = () => {
+                cachedWhaleHistory = [];
+                renderWhaleHistoryUI();
+            };
+        }
+
         let depthWs = null;
         let whaleAudioEnabled = true;
         let audioCtx = null;
@@ -948,15 +1007,28 @@
             }
         }
 
-        // MOSTRAR Y RENDERIZAR HISTÓRICO EN LA INTERFAZ
-        function renderWhaleHistoryUI() {
+        // MOSTRAR Y RENDERIZAR HISTÓRICO CON FILTRO DE TIEMPO
+        async function renderWhaleHistoryUI() {
+            const records = await getAllWhalesFromDB();
+            cachedWhaleHistory = records;
+
+            const filterType = document.getElementById('time-filter-select')?.value || 'all';
+            const now = Date.now();
+            let filteredRecords = records;
+
+            if (filterType === '1h') {
+                filteredRecords = records.filter(r => (now - r.timestamp) <= 3600000);
+            } else if (filterType === '24h') {
+                filteredRecords = records.filter(r => (now - r.timestamp) <= 86400000);
+            }
+
             const list = document.getElementById('whale-log-list');
             list.innerHTML = '';
 
             let totalBuyVol = 0;
             let totalSellVol = 0;
 
-            whaleHistoryData.forEach(item => {
+            filteredRecords.forEach(item => {
                 const isBid = item.type === 'BID';
                 if (isBid) totalBuyVol += item.qty;
                 else totalSellVol += item.qty;
@@ -1007,20 +1079,7 @@
                 qty: qty
             };
 
-            whaleHistoryData.push(newRecord);
-
-            // Guardar máximo 100 registros en el LocalStorage
-            if (whaleHistoryData.length > 100) {
-                whaleHistoryData.shift();
-            }
-
-            localStorage.setItem('quantz_whale_history', JSON.stringify(whaleHistoryData));
-            renderWhaleHistoryUI();
-        }
-
-        function clearWhaleHistory() {
-            whaleHistoryData = [];
-            localStorage.removeItem('quantz_whale_history');
+            saveWhaleToDB(newRecord);
             renderWhaleHistoryUI();
         }
 
@@ -1041,8 +1100,8 @@
                 bearVal.innerText = `${finalBear.toFixed(1)}%`;
                 bearBar.style.width = `${finalBear.toFixed(1)}%`;
 
-                const buyVol = whaleHistoryData.filter(d => d.type === 'BID').reduce((acc, d) => acc + d.qty, 0);
-                const sellVol = whaleHistoryData.filter(d => d.type === 'ASK').reduce((acc, d) => acc + d.qty, 0);
+                const buyVol = cachedWhaleHistory.filter(d => d.type === 'BID').reduce((acc, d) => acc + d.qty, 0);
+                const sellVol = cachedWhaleHistory.filter(d => d.type === 'ASK').reduce((acc, d) => acc + d.qty, 0);
 
                 if (finalBull >= 60.0 && buyVol >= sellVol) {
                     decisionText.innerText = 'ACUMULACIÓN ALCISTA CONFIRMADA';
@@ -1192,8 +1251,9 @@
         }
 
         window.addEventListener('DOMContentLoaded', async () => {
+            await initDB();
             renderMatrixMock();
-            renderWhaleHistoryUI();
+            await renderWhaleHistoryUI();
             startCandleTimer(selectedTF);
             await loadHistoricalKlines(selectedTF);
             connectBinanceKlines(selectedTF);
