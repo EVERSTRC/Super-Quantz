@@ -521,6 +521,7 @@
         let currentBtcPrice = 83886.0;
         let lastPrice = 0;
         let userPriceLines = [];
+        let projectionPriceLines = []; // Líneas proyectadas dinámicas de TP y SL
         let timerInterval = null;
         let lastCandleTimestamp = 0;
 
@@ -545,13 +546,18 @@
 
         let klineWs = null;
 
-        // DIBUJAR MARCADORES / FLECHAS EN EL GRÁFICO CON FILTRO DE TIEMPO
+        // LIMPIAR LÍNEAS DE PROYECIÓN DIBUJADAS PREVIAMENTE
+        function clearProjectionLines() {
+            projectionPriceLines.forEach(line => candlestickSeries.removePriceLine(line));
+            projectionPriceLines = [];
+        }
+
+        // DIBUJAR FLECHA + LÍNEAS DE PROYECCIÓN DONDE TERMINA EL MOVIMIENTO (TP / SL)
         function updateChartSignalMarker(signalType, price) {
             if (!lastCandleTimestamp) return;
 
             const nowSec = Math.floor(Date.now() / 1000);
 
-            // Evitar duplicados seguidos o señales muy frecuentes (menos de 5 minutos)
             if (lastSignalState === signalType || (nowSec - lastSignalTime < SIGNAL_COOLDOWN_SEC)) return;
             
             lastSignalState = signalType;
@@ -570,6 +576,32 @@
             if (chartMarkers.length > 15) chartMarkers.shift();
 
             candlestickSeries.setMarkers(chartMarkers);
+
+            // DIBUJAR LÍNEA DE META / FINAL DEL MOVIMIENTO EN EL GRÁFICO (TP Y SL)
+            clearProjectionLines();
+
+            const targetTpPrice = isBuy ? price * 1.015 : price * 0.985; // Meta TP (+1.5% o -1.5%)
+            const targetSlPrice = isBuy ? price * 0.992 : price * 1.008; // Stop Loss (-0.8% o +0.8%)
+
+            const tpLine = candlestickSeries.createPriceLine({
+                price: targetTpPrice,
+                color: '#0ecb81',
+                lineWidth: 2,
+                lineStyle: LightweightCharts.LineStyle.Dotted,
+                axisLabelVisible: true,
+                title: `🎯 TARGET TP: $${targetTpPrice.toFixed(1)}`,
+            });
+
+            const slLine = candlestickSeries.createPriceLine({
+                price: targetSlPrice,
+                color: '#f6465d',
+                lineWidth: 2,
+                lineStyle: LightweightCharts.LineStyle.Dotted,
+                axisLabelVisible: true,
+                title: `🛑 INVALIDACIÓN SL: $${targetSlPrice.toFixed(1)}`,
+            });
+
+            projectionPriceLines.push(tpLine, slLine);
         }
 
         // CARGAR HISTÓRICO REST BINANCE DE 100 VELAS
@@ -681,6 +713,7 @@
             lastSignalState = null;
             lastSignalTime = 0;
             candlestickSeries.setMarkers([]);
+            clearProjectionLines();
 
             startCandleTimer(selectedTF);
             await loadHistoricalKlines(selectedTF);
