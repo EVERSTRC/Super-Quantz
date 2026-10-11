@@ -527,6 +527,8 @@
         // MARCADORES Y SEÑALES VISUALES EN EL GRÁFICO (FLECHAS COMPRA/VENTA)
         let chartMarkers = [];
         let lastSignalState = null; // 'BUY' o 'SELL'
+        let lastSignalTime = 0;
+        const SIGNAL_COOLDOWN_SEC = 300; // Enfriamiento de 5 min entre señales para filtrar ruido
 
         // INICIALIZACIÓN DE LIGHTWEIGHT CHARTS
         const chartContainer = document.getElementById('tv-chart');
@@ -543,13 +545,17 @@
 
         let klineWs = null;
 
-        // DIBUJAR MARCADORES / FLECHAS EN EL GRÁFICO
+        // DIBUJAR MARCADORES / FLECHAS EN EL GRÁFICO CON FILTRO DE TIEMPO
         function updateChartSignalMarker(signalType, price) {
             if (!lastCandleTimestamp) return;
 
-            // Evitar duplicados seguidos de la misma dirección en el mismo estado
-            if (lastSignalState === signalType) return;
+            const nowSec = Math.floor(Date.now() / 1000);
+
+            // Evitar duplicados seguidos o señales muy frecuentes (menos de 5 minutos)
+            if (lastSignalState === signalType || (nowSec - lastSignalTime < SIGNAL_COOLDOWN_SEC)) return;
+            
             lastSignalState = signalType;
+            lastSignalTime = nowSec;
 
             const isBuy = signalType === 'BUY';
             const newMarker = {
@@ -560,7 +566,6 @@
                 text: isBuy ? `COMPRA @ $${price.toFixed(1)}` : `VENTA @ $${price.toFixed(1)}`
             };
 
-            // Mantener un historial limpio de hasta 15 señales en pantalla
             chartMarkers.push(newMarker);
             if (chartMarkers.length > 15) chartMarkers.shift();
 
@@ -672,9 +677,9 @@
                 tag.innerText = selectedTF;
             });
 
-            // Limpiar marcadores al cambiar marco temporal
             chartMarkers = [];
             lastSignalState = null;
+            lastSignalTime = 0;
             candlestickSeries.setMarkers([]);
 
             startCandleTimer(selectedTF);
@@ -890,7 +895,7 @@
             }
         }
 
-        // Detección e Integración del Score IA dinámico con Flechas en el Gráfico
+        // Detección e Integración del Score IA dinámico con Filtro de Umbral Elevado (65%)
         function updateAIScore(bidPct, askPct) {
             const bullVal = document.getElementById('score-bull-val');
             const bullBar = document.getElementById('score-bull-bar');
@@ -908,16 +913,17 @@
                 bearVal.innerText = `${finalBear.toFixed(1)}%`;
                 bearBar.style.width = `${finalBear.toFixed(1)}%`;
 
-                if (finalBull > 55) {
-                    decisionText.innerText = 'ACUMULACIÓN ALCISTA';
+                // FILTRO DE CERTEZA: UMBRAL MÍNIMO DEL 65% PARA DISPARAR SEÑAL
+                if (finalBull >= 65.0) {
+                    decisionText.innerText = 'ACUMULACIÓN ALCISTA FUERTE';
                     decisionText.style.color = 'var(--green)';
                     updateChartSignalMarker('BUY', currentBtcPrice);
-                } else if (finalBear > 55) {
-                    decisionText.innerText = 'PRESIÓN VENDEDORA';
+                } else if (finalBear >= 65.0) {
+                    decisionText.innerText = 'PRESIÓN VENDEDORA FUERTE';
                     decisionText.style.color = 'var(--red)';
                     updateChartSignalMarker('SELL', currentBtcPrice);
                 } else {
-                    decisionText.innerText = 'CONSOLIDACIÓN / NEUTRAL';
+                    decisionText.innerText = 'CONSOLIDACIÓN / RANGO NEUTRAL';
                     decisionText.style.color = 'var(--yellow)';
                 }
             }
