@@ -550,7 +550,7 @@
         </section>
     </main>
 
-    <!-- LÓGICA JAVASCRIPT COMPLETA CON MARCADORES FLECHAS BUY/SELL SOBRE EL GRÁFICO -->
+    <!-- LÓGICA JAVASCRIPT COMPLETA CON SINTETIZADOR DE SONIDO FUERTE Y SEÑALES -->
     <script>
         let chart, candleSeries;
         let drawnLines = [];
@@ -566,6 +566,7 @@
         let currentNetDelta = 0;
         let activeSupports = [];
         let activeResistances = [];
+        let audioCtx = null;
 
         const mockMatrixData = [
             { tf: '1m', binance: '60% C', bybit: '55% C', coinbase: '40% V', okx: '50% C' },
@@ -575,6 +576,71 @@
             { tf: '4h', binance: '75% C', bybit: '70% C', coinbase: '60% C', okx: '68% C' },
             { tf: '1D', binance: '80% C', bybit: '75% C', coinbase: '70% C', okx: '72% C' }
         ];
+
+        // REPRODUCTOR DE ALERTA FUERTE SINTETIZADA (WEB AUDIO API)
+        function playLoudSignalSound(type) {
+            if (!audioEnabled) return;
+            
+            try {
+                if (!audioCtx) {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+
+                const now = audioCtx.currentTime;
+                
+                // Generador de frecuencia (Oscilador 1)
+                const osc1 = audioCtx.createOscillator();
+                const gain1 = audioCtx.createGain();
+
+                // Generador de armónicos altos (Oscilador 2 para efecto penetrante)
+                const osc2 = audioCtx.createOscillator();
+                const gain2 = audioCtx.createGain();
+
+                osc1.type = 'sawtooth'; // Onda Diente de sierra para sonido potente/fuerte
+                osc2.type = 'square';   // Onda Cuadrada para tono de alarma penetrante
+
+                if (type === 'BUY') {
+                    // Tono Agudo Alcista Escalado
+                    osc1.frequency.setValueAtTime(880, now); // Nota A5
+                    osc1.frequency.exponentialRampToValueAtTime(1760, now + 0.3); // A6
+                    
+                    osc2.frequency.setValueAtTime(1320, now); // E6
+                    osc2.frequency.exponentialRampToValueAtTime(2640, now + 0.3); // E7
+                } else {
+                    // Tono Alarmante Bajista Caótico
+                    osc1.frequency.setValueAtTime(1200, now);
+                    osc1.frequency.exponentialRampToValueAtTime(400, now + 0.35);
+                    
+                    osc2.frequency.setValueAtTime(900, now);
+                    osc2.frequency.exponentialRampToValueAtTime(300, now + 0.35);
+                }
+
+                // Configuración de Volumen Alto y Rápido Decay
+                gain1.gain.setValueAtTime(0.35, now);
+                gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+
+                gain2.gain.setValueAtTime(0.25, now);
+                gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+
+                osc1.connect(gain1);
+                gain1.connect(audioCtx.destination);
+
+                osc2.connect(gain2);
+                gain2.connect(audioCtx.destination);
+
+                osc1.start(now);
+                osc2.start(now);
+
+                osc1.stop(now + 0.45);
+                osc2.stop(now + 0.45);
+            } catch (e) {
+                console.error("Error reproduciendo audio:", e);
+            }
+        }
 
         function initDB() {
             const request = indexedDB.open("QuantzWhaleDB", 3);
@@ -755,7 +821,7 @@
             processSignalEngine();
         }
 
-        // FUNCIÓN QUE DISPARA LA SEÑAL CERTERA Y DIBUJA FLECHAS BUY/SELL SOBRE EL GRÁFICO
+        // FUNCIÓN QUE DISPARA LA SEÑAL CERTERA, SONIDO FUERTE Y FLECHAS EN EL GRÁFICO
         function processSignalEngine() {
             if (currentPrice === 0 || activeSupports.length === 0 || !currentCandle) return;
 
@@ -784,9 +850,10 @@
                 document.getElementById('sig-sl').innerText = `$${(nearestSup * 0.997).toFixed(2)}`;
                 document.getElementById('sig-tp').innerText = `$${(currentPrice + (currentPrice - nearestSup * 0.997) * 2).toFixed(2)}`;
 
-                // DIBUJA MARCADOR DE FLECHA VERDE ARRIBA (BUY) EN LA VELA
+                // DIBUJA MARCADOR DE FLECHA Y REPRODUCE ALERTA DE AUDIO FUERTE
                 if (lastSignalType !== 'BUY') {
                     lastSignalType = 'BUY';
+                    playLoudSignalSound('BUY');
                     chartMarkers.push({
                         time: currentCandle.time,
                         position: 'belowBar',
@@ -807,9 +874,10 @@
                 document.getElementById('sig-sl').innerText = `$${(nearestRes * 1.003).toFixed(2)}`;
                 document.getElementById('sig-tp').innerText = `$${(currentPrice - (nearestRes * 1.003 - currentPrice) * 2).toFixed(2)}`;
 
-                // DIBUJA MARCADOR DE FLECHA ROJA ABAJO (SELL) EN LA VELA
+                // DIBUJA MARCADOR DE FLECHA Y REPRODUCE ALERTA DE AUDIO FUERTE
                 if (lastSignalType !== 'SELL') {
                     lastSignalType = 'SELL';
+                    playLoudSignalSound('SELL');
                     chartMarkers.push({
                         time: currentCandle.time,
                         position: 'aboveBar',
@@ -1115,6 +1183,16 @@
             renderMatrixTable();
             connectBinanceWS();
             startCandleTimer();
+            
+            // Habilita contexto de audio con la primera interacción del usuario si el navegador lo requiere
+            document.body.addEventListener('click', () => {
+                if (!audioCtx) {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+            }, { once: true });
         };
     </script>
 </body>
