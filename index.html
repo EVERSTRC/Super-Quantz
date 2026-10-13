@@ -502,7 +502,7 @@
         </section>
     </main>
 
-    <!-- LÓGICA JAVASCRIPT CON MANEJO DE ERRORES ASÍNCRONOS Y FLUJE DE DATOS FLUIDO -->
+    <!-- LÓGICA JAVASCRIPT CON SOPORTES Y RESISTENCIAS DE 1m Y 5m AGREGADOS -->
     <script>
         let chart, candleSeries;
         let drawnLines = [];
@@ -577,6 +577,7 @@
                 .catch(err => console.error("Error cargando velas:", err));
         }
 
+        // MOTOR MULTI-TEMPORALIDAD: DIBUJA 1m, 5m, 15m, 1h, 4h Y 1d EN SIMULTÁNEO
         function loadMultiTimeframeLevels() {
             whaleLines.forEach(line => {
                 try { candleSeries.removePriceLine(line); } catch(e){}
@@ -584,6 +585,8 @@
             whaleLines = [];
 
             const timeframes = [
+                { tf: '1m', style: LightweightCharts.LineStyle.Dotted, width: 1 },
+                { tf: '5m', style: LightweightCharts.LineStyle.Dotted, width: 1 },
                 { tf: '15m', style: LightweightCharts.LineStyle.Dotted, width: 1 },
                 { tf: '1h', style: LightweightCharts.LineStyle.Dashed, width: 1 },
                 { tf: '4h', style: LightweightCharts.LineStyle.Solid, width: 2 },
@@ -815,7 +818,6 @@
             }
         }
 
-        // WEBSOCKET FLUIDO Y SIN TRABAS EN EL GRÁFICO
         function connectBinanceWS() {
             const ws = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@ticker/btcusdt@depth10@100ms/btcusdt@trade');
             
@@ -827,7 +829,6 @@
             ws.onmessage = (e) => {
                 const data = JSON.parse(e.data);
 
-                // DETECCIÓN Y REGISTRO EN VIVO DE ÓRDENES BALLENA
                 if (data.e === 'trade') {
                     const qty = parseFloat(data.q);
                     const price = parseFloat(data.p);
@@ -855,7 +856,6 @@
                     document.getElementById('opt-sl').innerText = `$${(currentPrice * 0.992).toFixed(2)}`;
                     document.getElementById('opt-tp1').innerText = `$${(currentPrice * 1.016).toFixed(2)}`;
 
-                    // ACTUALIZACIÓN DE LA VELA ACTUAL SIN TRABAR EL NAVEGADOR
                     if (currentCandle) {
                         currentCandle.close = currentPrice;
                         if (currentPrice > currentCandle.high) currentCandle.high = currentPrice;
