@@ -263,7 +263,7 @@
             <section class="panel" id="orderbook-panel">
                 <div class="panel-header">
                     <div style="display: flex; align-items: center; gap: 8px;">
-                        <span class="panel-title">📖 Libro de Órdenes & Base de Datos IndexedDB (&ge; 10 BTC)</span>
+                        <span class="panel-title">📖 Libro de Órdenes & Base de Datos IndexedDB (&ge; 1 BTC)</span>
                         <span style="font-size: 0.72rem; color: var(--cyan); font-weight: 700;">Unlimited Persistence</span>
                     </div>
                     <button id="whale-sound-btn" class="btn-line" onclick="toggleWhaleAudio()" style="border-color: var(--yellow); color: var(--yellow);">
@@ -508,7 +508,7 @@
         </section>
     </main>
 
-    <!-- LÓGICA JAVASCRIPT COMPLETA CON SOPORTES Y RESISTENCIAS DE BALLENAS -->
+    <!-- LÓGICA JAVASCRIPT CORREGIDA Y OPTIMIZADA -->
     <script>
         // VARIABLES GLOBALES
         let chart, candleSeries;
@@ -518,7 +518,6 @@
         let audioEnabled = true;
         let db;
 
-        // ESTRUCTURA DE DATOS PARA LA MATRIZ MULTI-BROKER DE EJEMPLO
         const mockMatrixData = [
             { tf: '1m', binance: '60% C', bybit: '55% C', coinbase: '40% V', okx: '50% C' },
             { tf: '5m', binance: '65% C', bybit: '60% C', coinbase: '45% V', okx: '52% C' },
@@ -544,9 +543,6 @@
                 db = e.target.result;
                 renderWhaleHistoryUI();
             };
-            request.onerror = (e) => {
-                console.error("Error al abrir IndexedDB:", e);
-            };
         }
 
         // 2. CONFIGURACIÓN DEL GRÁFICO LIGHTWEIGHT CHARTS
@@ -566,72 +562,74 @@
                 wickUpColor: '#0ecb81', wickDownColor: '#f6465d'
             });
 
-            // Cargar datos iniciales simulación de velas
-            const now = Math.floor(Date.now() / 1000);
-            let basePrice = 65000;
-            const dummyData = [];
-            for (let i = 50; i >= 0; i--) {
-                const open = basePrice + (Math.random() - 0.5) * 200;
-                const high = open + Math.random() * 100;
-                const low = open - Math.random() * 100;
-                const close = (high + low) / 2;
-                dummyData.push({ time: now - i * 900, open, high, low, close });
-                basePrice = close;
-            }
-            candleSeries.setData(dummyData);
+            // CARGAR VELAS HISTÓRICAS REALES DE BINANCE SPOT (15m)
+            fetch('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=15m&limit=100')
+                .then(res => res.json())
+                .then(data => {
+                    const klines = data.map(d => ({
+                        time: Math.floor(d[0] / 1000),
+                        open: parseFloat(d[1]),
+                        high: parseFloat(d[2]),
+                        low: parseFloat(d[3]),
+                        close: parseFloat(d[4])
+                    }));
+                    candleSeries.setData(klines);
+                    chart.timeScale().fitContent();
+                })
+                .catch(err => console.error("Error al cargar velas reales:", err));
         }
 
         // 3. DIBUJAR NIVELES DE SOPORTE Y RESISTENCIA DE BALLENAS EN EL GRÁFICO
         function drawWhaleLevels(buyLevels, sellLevels) {
-            // Eliminar líneas anteriores trazadas dinámicamente por la IA
+            // Limpiar líneas anteriores
             whaleLines.forEach(line => {
-                try { candleSeries.removePriceLine(line); } catch(err){}
+                try { candleSeries.removePriceLine(line); } catch(e){}
             });
             whaleLines = [];
 
-            // Soportes Ballena (Compras >= 10 BTC) -> Línea Verde
-            buyLevels.forEach(item => {
+            // Trazar los mejores 2 niveles de soporte (compras)
+            buyLevels.slice(0, 2).forEach(item => {
                 const line = candleSeries.createPriceLine({
                     price: parseFloat(item.price),
                     color: '#0ecb81',
                     lineWidth: 2,
                     lineStyle: LightweightCharts.LineStyle.Solid,
                     axisLabelVisible: true,
-                    title: `🐳 SUP BALLENA: ${item.qty.toFixed(1)} BTC`
+                    title: `🐳 SUP BALLENA: ${item.qty.toFixed(2)} BTC`
                 });
                 whaleLines.push(line);
             });
 
-            // Resistencias Ballena (Ventas >= 10 BTC) -> Línea Roja
-            sellLevels.forEach(item => {
+            // Trazar los mejores 2 niveles de resistencia (ventas)
+            sellLevels.slice(0, 2).forEach(item => {
                 const line = candleSeries.createPriceLine({
                     price: parseFloat(item.price),
                     color: '#f6465d',
                     lineWidth: 2,
                     lineStyle: LightweightCharts.LineStyle.Solid,
                     axisLabelVisible: true,
-                    title: `🐳 RES BALLENA: ${item.qty.toFixed(1)} BTC`
+                    title: `🐳 RES BALLENA: ${item.qty.toFixed(2)} BTC`
                 });
                 whaleLines.push(line);
             });
         }
 
-        // 4. PROCESAR ORDENES DEL LIBRO DE ÓRDENES Y CREAR SUP/RES
+        // 4. PROCESAR ORDENES Y ACTUALIZAR DIBUJO DENTRO DEL LIBRO
         function updateWhaleLevelsFromData(asks, bids) {
-            const WHALE_THRESHOLD = 10.0; // Filtro >= 10 BTC
+            // Umbral ajustado para nivel de profundidad en directo
+            const WHALE_THRESHOLD = 0.8;
 
-            const whaleBids = bids.filter(b => parseFloat(b[1]) >= WHALE_THRESHOLD)
-                                  .map(b => ({ price: parseFloat(b[0]), qty: parseFloat(b[1]) }));
+            const whaleBids = bids.map(b => ({ price: parseFloat(b[0]), qty: parseFloat(b[1]) }))
+                                  .sort((a,b) => b.qty - a.qty);
 
-            const whaleAsks = asks.filter(a => parseFloat(a[1]) >= WHALE_THRESHOLD)
-                                  .map(a => ({ price: parseFloat(a[0]), qty: parseFloat(a[1]) }));
+            const whaleAsks = asks.map(a => ({ price: parseFloat(a[0]), qty: parseFloat(a[1]) }))
+                                  .sort((a,b) => b.qty - a.qty);
 
-            // Trazar directamente en el gráfico los mejores niveles de oferta/demanda ballena
-            drawWhaleLevels(whaleBids.slice(0, 3), whaleAsks.slice(0, 3));
+            drawWhaleLevels(whaleBids, whaleAsks);
 
-            // Guardar en la base de datos IndexedDB si hay orden destacada
-            whaleBids.forEach(b => saveWhaleOrder('BUY', b.price, b.qty));
-            whaleAsks.forEach(a => saveWhaleOrder('SELL', a.price, a.qty));
+            // Registrar en base de datos si la orden es realmente relevante (>= 1.5 BTC)
+            whaleBids.filter(b => b.qty >= 1.5).forEach(b => saveWhaleOrder('BUY', b.price, b.qty));
+            whaleAsks.filter(a => a.qty >= 1.5).forEach(a => saveWhaleOrder('SELL', a.price, a.qty));
         }
 
         // 5. REGISTRO Y RENDERIZADO DE INDEXEDDB HISTÓRICO
@@ -679,7 +677,6 @@
                 deltaEl.innerText = `${netDelta >= 0 ? '+' : ''}${netDelta.toFixed(2)} BTC`;
                 deltaEl.style.color = netDelta >= 0 ? 'var(--green)' : 'var(--red)';
                 
-                // Actualizar valor de CVD en tarjetón de métricas
                 document.getElementById("cvd-val").innerText = `${netDelta >= 0 ? '+' : ''}${netDelta.toFixed(2)} BTC`;
                 document.getElementById("cvd-val").style.color = netDelta >= 0 ? 'var(--green)' : 'var(--red)';
             };
@@ -692,7 +689,7 @@
             tx.oncomplete = () => renderWhaleHistoryUI();
         }
 
-        // 6. RENDERIZADO DE TABLA Y MATRIZ MULTI-BROKER
+        // 6. RENDERIZADO DE TABLA MULTI-BROKER
         function renderMatrixTable() {
             const tbody = document.getElementById('matrix-tbody');
             tbody.innerHTML = '';
@@ -710,7 +707,7 @@
             });
         }
 
-        // 7. LÓGICA DE DIBUJO MANUAL EN EL GRÁFICO
+        // 7. LÓGICA DE DIBUJO MANUAL
         function addManualLine(type) {
             const val = parseFloat(document.getElementById('manual-price-input').value);
             if (!val) return;
@@ -742,7 +739,7 @@
             document.querySelectorAll('.selected-tf-tag').forEach(el => el.innerText = tf);
         }
 
-        // 8. CONEXIÓN WEBSOCKET Y COMPONENTES EN TIEMPO REAL
+        // 8. CONEXIÓN WEBSOCKET BINANCE SPOT
         function renderOrderBookUI(asks, bids) {
             const asksContainer = document.getElementById('ob-asks-list');
             const bidsContainer = document.getElementById('ob-bids-list');
@@ -753,13 +750,12 @@
             let totalAskVol = 0;
             let totalBidVol = 0;
 
-            // Render Vendedoras (Asks)
             asks.slice(0, 5).reverse().forEach(ask => {
                 const p = parseFloat(ask[0]);
                 const q = parseFloat(ask[1]);
                 const tot = p * q;
                 totalAskVol += q;
-                const isWhale = q >= 10.0;
+                const isWhale = q >= 1.0;
 
                 const row = document.createElement('div');
                 row.className = `ob-row ob-ask ${isWhale ? 'ob-row-whale' : ''}`;
@@ -767,18 +763,17 @@
                     <div class="price">${p.toFixed(2)} ${isWhale ? '<span class="whale-tag">BALLENA</span>' : ''}</div>
                     <div>${q.toFixed(4)}</div>
                     <div>$${tot.toFixed(0)}</div>
-                    <div class="ob-bg-fill" style="width: ${Math.min(q * 5, 100)}%;"></div>
+                    <div class="ob-bg-fill" style="width: ${Math.min(q * 10, 100)}%;"></div>
                 `;
                 asksContainer.appendChild(row);
             });
 
-            // Render Compradoras (Bids)
             bids.slice(0, 5).forEach(bid => {
                 const p = parseFloat(bid[0]);
                 const q = parseFloat(bid[1]);
                 const tot = p * q;
                 totalBidVol += q;
-                const isWhale = q >= 10.0;
+                const isWhale = q >= 1.0;
 
                 const row = document.createElement('div');
                 row.className = `ob-row ob-bid ${isWhale ? 'ob-row-whale' : ''}`;
@@ -786,12 +781,11 @@
                     <div class="price">${p.toFixed(2)} ${isWhale ? '<span class="whale-tag">BALLENA</span>' : ''}</div>
                     <div>${q.toFixed(4)}</div>
                     <div>$${tot.toFixed(0)}</div>
-                    <div class="ob-bg-fill" style="width: ${Math.min(q * 5, 100)}%;"></div>
+                    <div class="ob-bg-fill" style="width: ${Math.min(q * 10, 100)}%;"></div>
                 `;
                 bidsContainer.appendChild(row);
             });
 
-            // Calcular Presión de Compra / Venta
             const sum = totalAskVol + totalBidVol;
             if (sum > 0) {
                 const bidPct = (totalBidVol / sum) * 100;
@@ -814,7 +808,6 @@
             ws.onmessage = (e) => {
                 const data = JSON.parse(e.data);
 
-                // Actualizar Ticker 24h
                 if (data.e === '24hrTicker') {
                     currentPrice = parseFloat(data.c);
                     document.getElementById('binance-price').innerText = `$${currentPrice.toFixed(2)}`;
@@ -828,23 +821,20 @@
 
                     document.getElementById('ob-current-mid').innerText = `$${currentPrice.toFixed(2)}`;
 
-                    // Configurar Opciones de Entrada
                     document.getElementById('opt-entry').innerText = `$${currentPrice.toFixed(2)}`;
                     document.getElementById('opt-sl').innerText = `$${(currentPrice * 0.992).toFixed(2)}`;
                     document.getElementById('opt-tp1').innerText = `$${(currentPrice * 1.016).toFixed(2)}`;
 
-                    // Actualizar Vela Actual en el Gráfico
                     const nowSec = Math.floor(Date.now() / 1000);
                     candleSeries.update({
                         time: nowSec - (nowSec % 900),
                         open: currentPrice,
-                        high: currentPrice + 10,
-                        low: currentPrice - 10,
+                        high: currentPrice + 5,
+                        low: currentPrice - 5,
                         close: currentPrice
                     });
                 }
 
-                // Actualizar Libro de Órdenes y Niveles Ballena
                 if (data.asks && data.bids) {
                     renderOrderBookUI(data.asks, data.bids);
                     updateWhaleLevelsFromData(data.asks, data.bids);
@@ -861,7 +851,6 @@
             };
         }
 
-        // CONTADOR DE TIEMPO PARA VELAS (15M)
         function startCandleTimer() {
             setInterval(() => {
                 const now = new Date();
@@ -879,7 +868,6 @@
             }, 1000);
         }
 
-        // INICIALIZACIÓN GLOBAL AL CARGAR LA PÁGINA
         window.onload = () => {
             initDB();
             initChart();
