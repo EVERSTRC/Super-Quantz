@@ -129,7 +129,7 @@
         .advisor-label { font-size: 0.65rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; }
         .advisor-val { font-size: 0.85rem; font-weight: 900; margin-top: 2px; }
 
-        /* TARJETA DINÁMICA DE SEÑAL DISPARADA */
+        /* TARJETA DINÁMICA DE SEÑAL AUTOMÁTICA EN TIEMPO REAL */
         .signal-alert-card {
             background: rgba(15, 18, 26, 0.95);
             border: 2px solid var(--border-color);
@@ -550,11 +550,13 @@
         </section>
     </main>
 
-    <!-- LÓGICA JAVASCRIPT COMPLETA CON MOTOR DE SEÑAL CERTERA INTEGRADO -->
+    <!-- LÓGICA JAVASCRIPT COMPLETA CON MARCADORES FLECHAS BUY/SELL SOBRE EL GRÁFICO -->
     <script>
         let chart, candleSeries;
         let drawnLines = [];
         let whaleLines = [];
+        let chartMarkers = [];
+        let lastSignalType = null;
         let currentPrice = 0;
         let audioEnabled = true;
         let db;
@@ -626,6 +628,11 @@
                     currentCandle = klines[klines.length - 1];
                     candleSeries.setData(klines);
                     chart.timeScale().fitContent();
+
+                    // Limpia marcadores al cambiar temporalidad
+                    chartMarkers = [];
+                    candleSeries.setMarkers([]);
+                    lastSignalType = null;
 
                     loadMultiTimeframeLevels();
                 })
@@ -748,9 +755,9 @@
             processSignalEngine();
         }
 
-        // FUNCIÓN QUE DISPARA LA SEÑAL CERTERA SI CUMPLE LA CONFLUENCIA 3-IN-1
+        // FUNCIÓN QUE DISPARA LA SEÑAL CERTERA Y DIBUJA FLECHAS BUY/SELL SOBRE EL GRÁFICO
         function processSignalEngine() {
-            if (currentPrice === 0 || activeSupports.length === 0) return;
+            if (currentPrice === 0 || activeSupports.length === 0 || !currentCandle) return;
 
             const card = document.getElementById('signal-card');
             const actionText = document.getElementById('signal-action-text');
@@ -776,6 +783,19 @@
                 document.getElementById('sig-entry').innerText = `$${currentPrice.toFixed(2)}`;
                 document.getElementById('sig-sl').innerText = `$${(nearestSup * 0.997).toFixed(2)}`;
                 document.getElementById('sig-tp').innerText = `$${(currentPrice + (currentPrice - nearestSup * 0.997) * 2).toFixed(2)}`;
+
+                // DIBUJA MARCADOR DE FLECHA VERDE ARRIBA (BUY) EN LA VELA
+                if (lastSignalType !== 'BUY') {
+                    lastSignalType = 'BUY';
+                    chartMarkers.push({
+                        time: currentCandle.time,
+                        position: 'belowBar',
+                        color: '#0ecb81',
+                        shape: 'arrowUp',
+                        text: 'BUY 🟢'
+                    });
+                    candleSeries.setMarkers(chartMarkers);
+                }
             } 
             // CONDICIÓN SELL SHORT: Precio en Resistencia + Dominio Vendedor (BidPct <= 42%) + Net Delta Negativo
             else if (distToResPct <= THRESHOLD_DIST && currentBidPct <= 42 && currentNetDelta <= 0) {
@@ -786,6 +806,19 @@
                 document.getElementById('sig-entry').innerText = `$${currentPrice.toFixed(2)}`;
                 document.getElementById('sig-sl').innerText = `$${(nearestRes * 1.003).toFixed(2)}`;
                 document.getElementById('sig-tp').innerText = `$${(currentPrice - (nearestRes * 1.003 - currentPrice) * 2).toFixed(2)}`;
+
+                // DIBUJA MARCADOR DE FLECHA ROJA ABAJO (SELL) EN LA VELA
+                if (lastSignalType !== 'SELL') {
+                    lastSignalType = 'SELL';
+                    chartMarkers.push({
+                        time: currentCandle.time,
+                        position: 'aboveBar',
+                        color: '#f6465d',
+                        shape: 'arrowDown',
+                        text: 'SELL 🔴'
+                    });
+                    candleSeries.setMarkers(chartMarkers);
+                }
             } 
             // SIN CONFLUENCIA
             else {
