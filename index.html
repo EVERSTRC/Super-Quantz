@@ -502,7 +502,7 @@
         </section>
     </main>
 
-    <!-- LÓGICA JAVASCRIPT CON GRÁFICO OSCURO (SIN LÍNEAS) Y COLORIMETRÍA NEÓN DESTACADA -->
+    <!-- LÓGICA JAVASCRIPT CORREGIDA CON EVALUACIÓN DE DECISIÓN IA EN TIEMPO REAL -->
     <script>
         let chart, candleSeries;
         let drawnLines = [];
@@ -512,6 +512,8 @@
         let db;
         let currentInterval = '15m';
         let currentCandle = null;
+        let currentBidPct = 50;
+        let currentNetDelta = 0;
 
         const mockMatrixData = [
             { tf: '1m', binance: '60% C', bybit: '55% C', coinbase: '40% V', okx: '50% C' },
@@ -580,14 +582,12 @@
                 .catch(err => console.error("Error cargando velas:", err));
         }
 
-        // MOTOR MULTI-TEMPORALIDAD CON COLORES ELECTRICOS DESTACADOS
         function loadMultiTimeframeLevels() {
             whaleLines.forEach(line => {
                 try { candleSeries.removePriceLine(line); } catch(e){}
             });
             whaleLines = [];
 
-            // PALETA DE COLORES NEÓN DISTINTIVA POR TEMPORALIDAD
             const timeframes = [
                 { tf: '1m',  supCol: '#00e5ff', resCol: '#ff0055', style: LightweightCharts.LineStyle.Dotted, width: 1 },
                 { tf: '5m',  supCol: '#76ff03', resCol: '#ff3d00', style: LightweightCharts.LineStyle.Dotted, width: 1 },
@@ -638,6 +638,58 @@
                     })
                     .catch(err => console.error(`Error calculando niveles para ${tfObj.tf}:`, err));
             });
+        }
+
+        // FUNCIÓN QUE EVALÚA Y ACTUALIZA EL RECUADRO DE RECOMENDACIÓN IA
+        function evaluateMarketStrategy() {
+            let bullScore = 50;
+
+            // Ajusta el puntaje según la presión de compra del Order Book
+            if (currentBidPct > 55) bullScore += 20;
+            else if (currentBidPct < 45) bullScore -= 20;
+
+            // Ajusta según la acumulación neta de ballenas (CVD)
+            if (currentNetDelta > 10) bullScore += 20;
+            else if (currentNetDelta < -10) bullScore -= 20;
+
+            bullScore = Math.max(5, Math.min(95, bullScore));
+            const bearScore = 100 - bullScore;
+
+            document.getElementById('score-bull-val').innerText = `${bullScore.toFixed(1)}%`;
+            document.getElementById('score-bull-bar').style.width = `${bullScore}%`;
+            document.getElementById('score-bear-val').innerText = `${bearScore.toFixed(1)}%`;
+            document.getElementById('score-bear-bar').style.width = `${bearScore}%`;
+
+            const decisionText = document.getElementById('decision-text');
+            const buyStatus = document.getElementById('adv-buy-status');
+            const sellStatus = document.getElementById('adv-sell-status');
+            const summaryNote = document.getElementById('adv-summary-note');
+
+            if (bullScore >= 65) {
+                decisionText.innerText = "COMPRA FUERTE (LONG)";
+                decisionText.style.color = "var(--green)";
+                buyStatus.innerText = "CONFIRMADO 🟢";
+                buyStatus.style.color = "var(--green)";
+                sellStatus.innerText = "INVALIDADO 🔴";
+                sellStatus.style.color = "var(--red)";
+                summaryNote.innerText = "Presión compradora predominante con acumulación institucional.";
+            } else if (bearScore >= 65) {
+                decisionText.innerText = "VENTA FUERTE (SHORT)";
+                decisionText.style.color = "var(--red)";
+                buyStatus.innerText = "INVALIDADO 🔴";
+                buyStatus.style.color = "var(--red)";
+                sellStatus.innerText = "CONFIRMADO 🟢";
+                sellStatus.style.color = "var(--green)";
+                summaryNote.innerText = "Presión vendedora activa en el libro de órdenes y flujo de ballenas.";
+            } else {
+                decisionText.innerText = "MERCADO NEUTRAL / CONSOLIDACIÓN";
+                decisionText.style.color = "var(--yellow)";
+                buyStatus.innerText = "EN ESPERA 🟡";
+                buyStatus.style.color = "var(--yellow)";
+                sellStatus.innerText = "EN ESPERA 🟡";
+                sellStatus.style.color = "var(--yellow)";
+                summaryNote.innerText = "Mercado en equilibrio. Esperando confirmación de ruptura o volumen de ballenas.";
+            }
         }
 
         function saveWhaleOrder(type, price, qty) {
@@ -697,13 +749,15 @@
                 document.getElementById("wh-hist-buy-vol").innerText = `${buyVol.toFixed(2)} BTC`;
                 document.getElementById("wh-hist-sell-vol").innerText = `${sellVol.toFixed(2)} BTC`;
                 
-                const netDelta = buyVol - sellVol;
+                currentNetDelta = buyVol - sellVol;
                 const deltaEl = document.getElementById("wh-hist-delta-val");
-                deltaEl.innerText = `${netDelta >= 0 ? '+' : ''}${netDelta.toFixed(2)} BTC`;
-                deltaEl.style.color = netDelta >= 0 ? 'var(--green)' : 'var(--red)';
+                deltaEl.innerText = `${currentNetDelta >= 0 ? '+' : ''}${currentNetDelta.toFixed(2)} BTC`;
+                deltaEl.style.color = currentNetDelta >= 0 ? 'var(--green)' : 'var(--red)';
                 
-                document.getElementById("cvd-val").innerText = `${netDelta >= 0 ? '+' : ''}${netDelta.toFixed(2)} BTC`;
-                document.getElementById("cvd-val").style.color = netDelta >= 0 ? 'var(--green)' : 'var(--red)';
+                document.getElementById("cvd-val").innerText = `${currentNetDelta >= 0 ? '+' : ''}${currentNetDelta.toFixed(2)} BTC`;
+                document.getElementById("cvd-val").style.color = currentNetDelta >= 0 ? 'var(--green)' : 'var(--red)';
+
+                evaluateMarketStrategy();
             };
         }
 
@@ -813,12 +867,14 @@
 
             const sum = totalAskVol + totalBidVol;
             if (sum > 0) {
-                const bidPct = (totalBidVol / sum) * 100;
+                currentBidPct = (totalBidVol / sum) * 100;
                 const askPct = (totalAskVol / sum) * 100;
-                document.getElementById('ob-bid-pressure-bar').style.width = `${bidPct}%`;
-                document.getElementById('ob-bids-pct').innerText = `${bidPct.toFixed(1)}% Compras`;
+                document.getElementById('ob-bid-pressure-bar').style.width = `${currentBidPct}%`;
+                document.getElementById('ob-bids-pct').innerText = `${currentBidPct.toFixed(1)}% Compras`;
                 document.getElementById('ob-asks-pct').innerText = `${askPct.toFixed(1)}% Ventas`;
-                document.getElementById('buyer-power-val').innerText = `${bidPct.toFixed(1)}%`;
+                document.getElementById('buyer-power-val').innerText = `${currentBidPct.toFixed(1)}%`;
+                
+                evaluateMarketStrategy();
             }
         }
 
