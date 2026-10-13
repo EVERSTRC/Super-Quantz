@@ -51,7 +51,7 @@
         .panel-body { padding: 20px; flex: 1; }
 
         /* CONTADOR DE CIERRE DE VELA EN EL GRÁFICO */
-        .candle-timer-box { position: absolute; top: 12px; left: 12px; z-index: 10; background: rgba(21, 25, 36, 0.90); backdrop-filter: blur(6px); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px 12px; min-width: 180px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+        .candle-timer-box { position: absolute; top: 12px; left: 12px; z-index: 10; background: rgba(11, 14, 20, 0.85); backdrop-filter: blur(6px); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px 12px; min-width: 180px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
         .timer-row { display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; font-weight: 700; margin-bottom: 4px; }
         .timer-lbl { color: var(--text-muted); text-transform: uppercase; font-size: 0.65rem; }
         .timer-val { font-family: 'Roboto Mono', monospace; font-size: 0.9rem; color: var(--cyan); }
@@ -68,8 +68,8 @@
         .btn-res { border-color: var(--red); color: var(--red); }
         .btn-res:hover { background-color: var(--red-bg); }
 
-        /* CONTENEDOR DEL GRÁFICO */
-        #chart-wrapper { width: 100%; height: 420px; position: relative; background-color: #131722; border-radius: 6px; overflow: hidden; border: 1px solid var(--border-color); }
+        /* CONTENEDOR DEL GRÁFICO OSCURO */
+        #chart-wrapper { width: 100%; height: 420px; position: relative; background-color: #0b0e14; border-radius: 6px; overflow: hidden; border: 1px solid var(--border-color); }
         #tv-chart { width: 100%; height: 100%; }
 
         /* ESTILOS DEL ORDER BOOK CON ALERTAS DE BALLENAS */
@@ -502,7 +502,7 @@
         </section>
     </main>
 
-    <!-- LÓGICA JAVASCRIPT CON SOPORTES Y RESISTENCIAS DE 1m Y 5m AGREGADOS -->
+    <!-- LÓGICA JAVASCRIPT CON GRÁFICO OSCURO (SIN LÍNEAS) Y COLORIMETRÍA NEÓN DESTACADA -->
     <script>
         let chart, candleSeries;
         let drawnLines = [];
@@ -540,8 +540,11 @@
         function initChart() {
             const chartElement = document.getElementById('tv-chart');
             chart = LightweightCharts.createChart(chartElement, {
-                layout: { backgroundColor: '#131722', textColor: '#d1d4dc' },
-                grid: { vertLines: { color: '#1f2430' }, horzLines: { color: '#1f2430' } },
+                layout: { backgroundColor: '#0b0e14', textColor: '#848e9c' },
+                grid: { 
+                    vertLines: { visible: false }, 
+                    horzLines: { visible: false } 
+                },
                 crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
                 priceScale: { borderColor: '#2a2e3d' },
                 timeScale: { borderColor: '#2a2e3d', timeVisible: true, secondsVisible: false }
@@ -577,20 +580,21 @@
                 .catch(err => console.error("Error cargando velas:", err));
         }
 
-        // MOTOR MULTI-TEMPORALIDAD: DIBUJA 1m, 5m, 15m, 1h, 4h Y 1d EN SIMULTÁNEO
+        // MOTOR MULTI-TEMPORALIDAD CON COLORES ELECTRICOS DESTACADOS
         function loadMultiTimeframeLevels() {
             whaleLines.forEach(line => {
                 try { candleSeries.removePriceLine(line); } catch(e){}
             });
             whaleLines = [];
 
+            // PALETA DE COLORES NEÓN DISTINTIVA POR TEMPORALIDAD
             const timeframes = [
-                { tf: '1m', style: LightweightCharts.LineStyle.Dotted, width: 1 },
-                { tf: '5m', style: LightweightCharts.LineStyle.Dotted, width: 1 },
-                { tf: '15m', style: LightweightCharts.LineStyle.Dotted, width: 1 },
-                { tf: '1h', style: LightweightCharts.LineStyle.Dashed, width: 1 },
-                { tf: '4h', style: LightweightCharts.LineStyle.Solid, width: 2 },
-                { tf: '1d', style: LightweightCharts.LineStyle.Solid, width: 3 }
+                { tf: '1m',  supCol: '#00e5ff', resCol: '#ff0055', style: LightweightCharts.LineStyle.Dotted, width: 1 },
+                { tf: '5m',  supCol: '#76ff03', resCol: '#ff3d00', style: LightweightCharts.LineStyle.Dotted, width: 1 },
+                { tf: '15m', supCol: '#00e676', resCol: '#f50057', style: LightweightCharts.LineStyle.Dotted, width: 2 },
+                { tf: '1h',  supCol: '#1de9b6', resCol: '#ff1744', style: LightweightCharts.LineStyle.Dashed, width: 2 },
+                { tf: '4h',  supCol: '#00b0ff', resCol: '#d500f9', style: LightweightCharts.LineStyle.Solid,  width: 2 },
+                { tf: '1d',  supCol: '#ffea00', resCol: '#ff6d00', style: LightweightCharts.LineStyle.Solid,  width: 3 }
             ];
 
             timeframes.forEach(tfObj => {
@@ -623,12 +627,12 @@
                         const avgRes = totalResVol > 0 ? (weightedResPrice / totalResVol) : (lastClose * 1.01);
 
                         const supLine = candleSeries.createPriceLine({
-                            price: avgSup, color: '#0ecb81', lineWidth: tfObj.width, lineStyle: tfObj.style, axisLabelVisible: true, title: `SUP (${tfObj.tf}): $${avgSup.toFixed(2)}`
+                            price: avgSup, color: tfObj.supCol, lineWidth: tfObj.width, lineStyle: tfObj.style, axisLabelVisible: true, title: `SUP (${tfObj.tf}): $${avgSup.toFixed(2)}`
                         });
                         whaleLines.push(supLine);
 
                         const resLine = candleSeries.createPriceLine({
-                            price: avgRes, color: '#f6465d', lineWidth: tfObj.width, lineStyle: tfObj.style, axisLabelVisible: true, title: `RES (${tfObj.tf}): $${avgRes.toFixed(2)}`
+                            price: avgRes, color: tfObj.resCol, lineWidth: tfObj.width, lineStyle: tfObj.style, axisLabelVisible: true, title: `RES (${tfObj.tf}): $${avgRes.toFixed(2)}`
                         });
                         whaleLines.push(resLine);
                     })
