@@ -550,7 +550,7 @@
         </section>
     </main>
 
-    <!-- LÓGICA JAVASCRIPT COMPLETA CON SINTETIZADOR DE SONIDO FUERTE Y SEÑALES -->
+    <!-- LÓGICA JAVASCRIPT CON WEBSOCKETS SEPARADOS Y RECONEXIÓN AUTOMÁTICA -->
     <script>
         let chart, candleSeries;
         let drawnLines = [];
@@ -567,6 +567,7 @@
         let activeSupports = [];
         let activeResistances = [];
         let audioCtx = null;
+        let wsKline = null, wsMarket = null;
 
         const mockMatrixData = [
             { tf: '1m', binance: '60% C', bybit: '55% C', coinbase: '40% V', okx: '50% C' },
@@ -591,50 +592,38 @@
                 }
 
                 const now = audioCtx.currentTime;
-                
-                // Generador de frecuencia (Oscilador 1)
                 const osc1 = audioCtx.createOscillator();
                 const gain1 = audioCtx.createGain();
-
-                // Generador de armónicos altos (Oscilador 2 para efecto penetrante)
                 const osc2 = audioCtx.createOscillator();
                 const gain2 = audioCtx.createGain();
 
-                osc1.type = 'sawtooth'; // Onda Diente de sierra para sonido potente/fuerte
-                osc2.type = 'square';   // Onda Cuadrada para tono de alarma penetrante
+                osc1.type = 'sawtooth';
+                osc2.type = 'square';
 
                 if (type === 'BUY') {
-                    // Tono Agudo Alcista Escalado
-                    osc1.frequency.setValueAtTime(880, now); // Nota A5
-                    osc1.frequency.exponentialRampToValueAtTime(1760, now + 0.3); // A6
-                    
-                    osc2.frequency.setValueAtTime(1320, now); // E6
-                    osc2.frequency.exponentialRampToValueAtTime(2640, now + 0.3); // E7
+                    osc1.frequency.setValueAtTime(880, now);
+                    osc1.frequency.exponentialRampToValueAtTime(1760, now + 0.3);
+                    osc2.frequency.setValueAtTime(1320, now);
+                    osc2.frequency.exponentialRampToValueAtTime(2640, now + 0.3);
                 } else {
-                    // Tono Alarmante Bajista Caótico
                     osc1.frequency.setValueAtTime(1200, now);
                     osc1.frequency.exponentialRampToValueAtTime(400, now + 0.35);
-                    
                     osc2.frequency.setValueAtTime(900, now);
                     osc2.frequency.exponentialRampToValueAtTime(300, now + 0.35);
                 }
 
-                // Configuración de Volumen Alto y Rápido Decay
                 gain1.gain.setValueAtTime(0.35, now);
                 gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
-
                 gain2.gain.setValueAtTime(0.25, now);
                 gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
 
                 osc1.connect(gain1);
                 gain1.connect(audioCtx.destination);
-
                 osc2.connect(gain2);
                 gain2.connect(audioCtx.destination);
 
                 osc1.start(now);
                 osc2.start(now);
-
                 osc1.stop(now + 0.45);
                 osc2.stop(now + 0.45);
             } catch (e) {
@@ -695,17 +684,42 @@
                     candleSeries.setData(klines);
                     chart.timeScale().fitContent();
 
-                    // Limpia marcadores al cambiar temporalidad
                     chartMarkers = [];
                     candleSeries.setMarkers([]);
                     lastSignalType = null;
 
                     loadMultiTimeframeLevels();
+                    connectKlineWS(interval);
                 })
                 .catch(err => console.error("Error cargando velas:", err));
         }
 
-        // MOTOR MULTI-TEMPORALIDAD: CALCULA NIVELES DE 1m, 5m, 15m, 1h, 4h Y 1d
+        function connectKlineWS(interval) {
+            if (wsKline) {
+                wsKline.close();
+            }
+
+            wsKline = new WebSocket(`wss://stream.binance.com:9443/ws/btcusdt@kline_${interval}`);
+
+            wsKline.onmessage = (e) => {
+                const data = JSON.parse(e.data);
+                if (data.k) {
+                    const k = data.k;
+                    const candleData = {
+                        time: Math.floor(k.t / 1000),
+                        open: parseFloat(k.o),
+                        high: parseFloat(k.h),
+                        low: parseFloat(k.l),
+                        close: parseFloat(k.c)
+                    };
+                    currentCandle = candleData;
+                    candleSeries.update(candleData);
+                }
+            };
+
+            wsKline.onclose = () => setTimeout(() => connectKlineWS(currentInterval), 3000);
+        }
+
         function loadMultiTimeframeLevels() {
             whaleLines.forEach(line => {
                 try { candleSeries.removePriceLine(line); } catch(e){}
@@ -769,7 +783,6 @@
             });
         }
 
-        // MOTOR DE EVALUACIÓN Y GENERADOR DE SEÑAL CERTERA
         function evaluateMarketStrategy() {
             let bullScore = 50;
 
@@ -821,7 +834,6 @@
             processSignalEngine();
         }
 
-        // FUNCIÓN QUE DISPARA LA SEÑAL CERTERA, SONIDO FUERTE Y FLECHAS EN EL GRÁFICO
         function processSignalEngine() {
             if (currentPrice === 0 || activeSupports.length === 0 || !currentCandle) return;
 
@@ -838,9 +850,8 @@
             const distToSupPct = Math.abs((currentPrice - nearestSup) / currentPrice) * 100;
             const distToResPct = Math.abs((nearestRes - currentPrice) / currentPrice) * 100;
 
-            const THRESHOLD_DIST = 0.20; // 0.20% de tolerancia respecto al nivel ballena
+            const THRESHOLD_DIST = 0.20;
 
-            // CONDICIÓN BUY LONG: Precio en Soporte + Dominio Comprador >= 58% + Net Delta Positivo
             if (distToSupPct <= THRESHOLD_DIST && currentBidPct >= 58 && currentNetDelta >= 0) {
                 card.className = "signal-alert-card signal-buy";
                 actionText.innerText = "🚀 COMPRA (BUY LONG)";
@@ -850,7 +861,6 @@
                 document.getElementById('sig-sl').innerText = `$${(nearestSup * 0.997).toFixed(2)}`;
                 document.getElementById('sig-tp').innerText = `$${(currentPrice + (currentPrice - nearestSup * 0.997) * 2).toFixed(2)}`;
 
-                // DIBUJA MARCADOR DE FLECHA Y REPRODUCE ALERTA DE AUDIO FUERTE
                 if (lastSignalType !== 'BUY') {
                     lastSignalType = 'BUY';
                     playLoudSignalSound('BUY');
@@ -864,7 +874,6 @@
                     candleSeries.setMarkers(chartMarkers);
                 }
             } 
-            // CONDICIÓN SELL SHORT: Precio en Resistencia + Dominio Vendedor (BidPct <= 42%) + Net Delta Negativo
             else if (distToResPct <= THRESHOLD_DIST && currentBidPct <= 42 && currentNetDelta <= 0) {
                 card.className = "signal-alert-card signal-sell";
                 actionText.innerText = "🔻 VENTA (SELL SHORT)";
@@ -874,7 +883,6 @@
                 document.getElementById('sig-sl').innerText = `$${(nearestRes * 1.003).toFixed(2)}`;
                 document.getElementById('sig-tp').innerText = `$${(currentPrice - (nearestRes * 1.003 - currentPrice) * 2).toFixed(2)}`;
 
-                // DIBUJA MARCADOR DE FLECHA Y REPRODUCE ALERTA DE AUDIO FUERTE
                 if (lastSignalType !== 'SELL') {
                     lastSignalType = 'SELL';
                     playLoudSignalSound('SELL');
@@ -888,7 +896,6 @@
                     candleSeries.setMarkers(chartMarkers);
                 }
             } 
-            // SIN CONFLUENCIA
             else {
                 card.className = "signal-alert-card signal-wait";
                 actionText.innerText = "ESPERANDO CONFLUENCIA...";
@@ -1085,15 +1092,17 @@
             }
         }
 
-        function connectBinanceWS() {
-            const ws = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@ticker/btcusdt@depth10@100ms/btcusdt@trade');
+        function connectMarketWS() {
+            if (wsMarket) wsMarket.close();
+
+            wsMarket = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@ticker/btcusdt@depth10@100ms/btcusdt@trade');
             
-            ws.onopen = () => {
+            wsMarket.onopen = () => {
                 document.getElementById('ws-status').innerText = 'CONECTADO';
                 document.getElementById('ws-status').style.color = 'var(--green)';
             };
 
-            ws.onmessage = (e) => {
+            wsMarket.onmessage = (e) => {
                 const data = JSON.parse(e.data);
 
                 if (data.e === 'trade') {
@@ -1122,13 +1131,6 @@
                     document.getElementById('opt-entry').innerText = `$${currentPrice.toFixed(2)}`;
                     document.getElementById('opt-sl').innerText = `$${(currentPrice * 0.992).toFixed(2)}`;
                     document.getElementById('opt-tp1').innerText = `$${(currentPrice * 1.016).toFixed(2)}`;
-
-                    if (currentCandle) {
-                        currentCandle.close = currentPrice;
-                        if (currentPrice > currentCandle.high) currentCandle.high = currentPrice;
-                        if (currentPrice < currentCandle.low) currentCandle.low = currentPrice;
-                        candleSeries.update(currentCandle);
-                    }
                 }
 
                 if (data.asks && data.bids) {
@@ -1139,10 +1141,12 @@
                 }
             };
 
-            ws.onerror = () => {
-                document.getElementById('ws-status').innerText = 'ERROR DE CONEXIÓN';
-                document.getElementById('ws-status').style.color = 'var(--red)';
+            wsMarket.onerror = () => {
+                document.getElementById('ws-status').innerText = 'RECONECTANDO...';
+                document.getElementById('ws-status').style.color = 'var(--yellow)';
             };
+
+            wsMarket.onclose = () => setTimeout(connectMarketWS, 3000);
         }
 
         function startCandleTimer() {
@@ -1181,10 +1185,9 @@
             initDB();
             initChart();
             renderMatrixTable();
-            connectBinanceWS();
+            connectMarketWS();
             startCandleTimer();
             
-            // Habilita contexto de audio con la primera interacción del usuario si el navegador lo requiere
             document.body.addEventListener('click', () => {
                 if (!audioCtx) {
                     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
