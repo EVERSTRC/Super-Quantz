@@ -453,7 +453,7 @@
                     </div>
                     <div class="metric-card">
                         <div class="lbl">Soportes/Resistencias Ballena</div>
-                        <div class="val" id="whale-levels-val" style="color: var(--cyan);">Activos</div>
+                        <div class="val" id="whale-levels-val" style="color: var(--cyan);">Promediado TF</div>
                     </div>
                     <div class="metric-card">
                         <div class="lbl">Fuerza Dom. Compradores</div>
@@ -504,16 +504,15 @@
         </section>
     </main>
 
-    <!-- LÓGICA JAVASCRIPT CORREGIDA CON CAMBIO DE TEMPORALIDAD DINÁMICO -->
+    <!-- LÓGICA JAVASCRIPT CON CÁLCULO PROMEDIADO DE NIVELES POR TEMPORALIDAD -->
     <script>
-        // VARIABLES GLOBALES
         let chart, candleSeries;
         let drawnLines = [];
         let whaleLines = [];
         let currentPrice = 0;
         let audioEnabled = true;
         let db;
-        let currentInterval = '15m'; // Temporalidad inicial por defecto
+        let currentInterval = '15m';
 
         const mockMatrixData = [
             { tf: '1m', binance: '60% C', bybit: '55% C', coinbase: '40% V', okx: '50% C' },
@@ -524,7 +523,6 @@
             { tf: '1D', binance: '80% C', bybit: '75% C', coinbase: '70% C', okx: '72% C' }
         ];
 
-        // 1. INICIALIZACIÓN DE INDEXEDDB PERSISTENTE
         function initDB() {
             const request = indexedDB.open("QuantzWhaleDB", 1);
             request.onupgradeneeded = (e) => {
@@ -542,7 +540,6 @@
             };
         }
 
-        // 2. CONFIGURACIÓN DEL GRÁFICO LIGHTWEIGHT CHARTS Y CARGA DE VELAS
         function initChart() {
             const chartElement = document.getElementById('tv-chart');
             chart = LightweightCharts.createChart(chartElement, {
@@ -562,7 +559,7 @@
             loadCandles(currentInterval);
         }
 
-        // FUNCIÓN PARA CARGAR LAS VELAS DESDE BINANCE SEGÚN LA TEMPORALIDAD SELECCIONADA
+        // CARGAR VELAS Y CÁLCULO DE NIVELES PROMEDIADOS POR VOLUMEN SEGÚN TEMPORALIDAD
         function loadCandles(interval) {
             fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${interval}&limit=100`)
                 .then(res => res.json())
@@ -572,61 +569,74 @@
                         open: parseFloat(d[1]),
                         high: parseFloat(d[2]),
                         low: parseFloat(d[3]),
-                        close: parseFloat(d[4])
+                        close: parseFloat(d[4]),
+                        volume: parseFloat(d[5])
                     }));
+
                     candleSeries.setData(klines);
                     chart.timeScale().fitContent();
+
+                    // PROMEDIADO PONDERADO POR VOLUMEN DE SOPORTES Y RESISTENCIAS
+                    calculateAveragedLevels(klines, interval);
                 })
                 .catch(err => console.error("Error al cargar velas de Binance:", err));
         }
 
-        // 3. DIBUJAR NIVELES DE SOPORTE Y RESISTENCIA DE BALLENAS EN EL GRÁFICO
-        function drawWhaleLevels(buyLevels, sellLevels) {
+        // CÁLCULO Y DIBUJO DE SOPORTES Y RESISTENCIAS PROMEDIADOS
+        function calculateAveragedLevels(klines, interval) {
+            if (!klines || klines.length === 0) return;
+
+            // Limpiar líneas anteriores
             whaleLines.forEach(line => {
                 try { candleSeries.removePriceLine(line); } catch(e){}
             });
             whaleLines = [];
 
-            buyLevels.slice(0, 2).forEach(item => {
-                const line = candleSeries.createPriceLine({
-                    price: parseFloat(item.price),
-                    color: '#0ecb81',
-                    lineWidth: 2,
-                    lineStyle: LightweightCharts.LineStyle.Solid,
-                    axisLabelVisible: true,
-                    title: `🐳 SUP BALLENA: ${item.qty.toFixed(2)} BTC`
-                });
-                whaleLines.push(line);
+            // Dividir velas en zonas por encima y por debajo del precio actual
+            const lastClose = klines[klines.length - 1].close;
+
+            let totalSupVol = 0, weightedSupPrice = 0;
+            let totalResVol = 0, weightedResPrice = 0;
+
+            klines.forEach(k => {
+                // Si el mínimo es menor al precio actual -> Zona de Soporte
+                if (k.low < lastClose) {
+                    weightedSupPrice += k.low * k.volume;
+                    totalSupVol += k.volume;
+                }
+                // Si el máximo es mayor al precio actual -> Zona de Resistencia
+                if (k.high > lastClose) {
+                    weightedResPrice += k.high * k.volume;
+                    totalResVol += k.volume;
+                }
             });
 
-            sellLevels.slice(0, 2).forEach(item => {
-                const line = candleSeries.createPriceLine({
-                    price: parseFloat(item.price),
-                    color: '#f6465d',
-                    lineWidth: 2,
-                    lineStyle: LightweightCharts.LineStyle.Solid,
-                    axisLabelVisible: true,
-                    title: `🐳 RES BALLENA: ${item.qty.toFixed(2)} BTC`
-                });
-                whaleLines.push(line);
+            const avgSupport = totalSupVol > 0 ? (weightedSupPrice / totalSupVol) : (lastClose * 0.99);
+            const avgResistance = totalResVol > 0 ? (weightedResPrice / totalResVol) : (lastClose * 1.01);
+
+            // Trazar línea de Soporte Promediado
+            const supLine = candleSeries.createPriceLine({
+                price: avgSupport,
+                color: '#0ecb81',
+                lineWidth: 2,
+                lineStyle: LightweightCharts.LineStyle.Solid,
+                axisLabelVisible: true,
+                title: `🐳 SUP PROM (${interval}): $${avgSupport.toFixed(2)}`
             });
+            whaleLines.push(supLine);
+
+            // Trazar línea de Resistencia Promediada
+            const resLine = candleSeries.createPriceLine({
+                price: avgResistance,
+                color: '#f6465d',
+                lineWidth: 2,
+                lineStyle: LightweightCharts.LineStyle.Solid,
+                axisLabelVisible: true,
+                title: `🐳 RES PROM (${interval}): $${avgResistance.toFixed(2)}`
+            });
+            whaleLines.push(resLine);
         }
 
-        // 4. PROCESAR ORDENES Y ACTUALIZAR DIBUJO DENTRO DEL LIBRO
-        function updateWhaleLevelsFromData(asks, bids) {
-            const whaleBids = bids.map(b => ({ price: parseFloat(b[0]), qty: parseFloat(b[1]) }))
-                                  .sort((a,b) => b.qty - a.qty);
-
-            const whaleAsks = asks.map(a => ({ price: parseFloat(a[0]), qty: parseFloat(a[1]) }))
-                                  .sort((a,b) => b.qty - a.qty);
-
-            drawWhaleLevels(whaleBids, whaleAsks);
-
-            whaleBids.filter(b => b.qty >= 1.5).forEach(b => saveWhaleOrder('BUY', b.price, b.qty));
-            whaleAsks.filter(a => a.qty >= 1.5).forEach(a => saveWhaleOrder('SELL', a.price, a.qty));
-        }
-
-        // 5. REGISTRO Y RENDERIZADO DE INDEXEDDB HISTÓRICO
         function saveWhaleOrder(type, price, qty) {
             if (!db) return;
             const tx = db.transaction("whaleOrders", "readwrite");
@@ -683,7 +693,6 @@
             tx.oncomplete = () => renderWhaleHistoryUI();
         }
 
-        // 6. RENDERIZADO DE TABLA MULTI-BROKER Y RESALTADO
         function renderMatrixTable() {
             const tbody = document.getElementById('matrix-tbody');
             tbody.innerHTML = '';
@@ -703,7 +712,6 @@
             });
         }
 
-        // 7. LÓGICA DE DIBUJO MANUAL Y CAMBIO DE TEMPORALIDAD
         function addManualLine(type) {
             const val = parseFloat(document.getElementById('manual-price-input').value);
             if (!val) return;
@@ -730,22 +738,18 @@
             document.getElementById('whale-sound-btn').innerText = `🔊 Audio Ballenas: ${audioEnabled ? 'ON' : 'OFF'}`;
         }
 
-        // CAMBIO DINÁMICO DE TEMPORALIDAD
         function onTimeframeChange() {
             const selectEl = document.getElementById('tf-analysis-select');
             currentInterval = selectEl.value;
 
-            // Actualizar etiquetas en la interfaz
             document.querySelectorAll('.selected-tf-tag').forEach(el => el.innerText = currentInterval);
 
-            // Cargar datos históricos de velas de la nueva temporalidad en el gráfico
+            // Recargar velas y recalcular niveles promediados automáticamente
             loadCandles(currentInterval);
 
-            // Actualizar resaltado de la matriz
             renderMatrixTable();
         }
 
-        // 8. CONEXIÓN WEBSOCKET BINANCE SPOT
         function renderOrderBookUI(asks, bids) {
             const asksContainer = document.getElementById('ob-asks-list');
             const bidsContainer = document.getElementById('ob-bids-list');
@@ -831,7 +835,6 @@
                     document.getElementById('opt-sl').innerText = `$${(currentPrice * 0.992).toFixed(2)}`;
                     document.getElementById('opt-tp1').innerText = `$${(currentPrice * 1.016).toFixed(2)}`;
 
-                    // CONVERSIÓN DE INTERVALO A SEGUNDOS PARA LA VELA EN VIVO
                     let tfSeconds = 900;
                     if (currentInterval === '1m') tfSeconds = 60;
                     else if (currentInterval === '5m') tfSeconds = 300;
@@ -852,7 +855,10 @@
 
                 if (data.asks && data.bids) {
                     renderOrderBookUI(data.asks, data.bids);
-                    updateWhaleLevelsFromData(data.asks, data.bids);
+
+                    // Registrar transacciones ballena mayores a 1.5 BTC
+                    data.bids.filter(b => parseFloat(b[1]) >= 1.5).forEach(b => saveWhaleOrder('BUY', parseFloat(b[0]), parseFloat(b[1])));
+                    data.asks.filter(a => parseFloat(a[1]) >= 1.5).forEach(a => saveWhaleOrder('SELL', parseFloat(a[0]), parseFloat(a[1])));
 
                     const topAsk = parseFloat(data.asks[0][0]);
                     const topBid = parseFloat(data.bids[0][0]);
@@ -866,7 +872,6 @@
             };
         }
 
-        // CONTADOR DE CIERRE DE VELA SEGÚN LA TEMPORALIDAD
         function startCandleTimer() {
             setInterval(() => {
                 let totalSecs = 900;
