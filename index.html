@@ -122,7 +122,7 @@
         .whale-log-box { margin-top: 10px; background: var(--bg-body); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; max-height: 120px; overflow-y: auto; font-size: 0.7rem; }
         .whale-log-item { display: flex; justify-content: space-between; padding: 2px 0; border-bottom: 1px dashed rgba(255,255,255,0.05); }
 
-        /* NUEVO PANEL DE ASESORÍA DE DECISIÓN COMPRAR / VENDER */
+        /* PANEL DE ASESORÍA DE DECISIÓN */
         .decision-advisor-card { background: linear-gradient(135deg, rgba(21, 25, 36, 0.98), rgba(15, 18, 26, 0.98)); border: 1px solid var(--yellow); border-radius: 8px; padding: 12px; margin-bottom: 15px; }
         .advisor-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 6px; margin-bottom: 8px; }
         .advisor-title { font-size: 0.75rem; color: var(--yellow); font-weight: 800; text-transform: uppercase; }
@@ -186,10 +186,6 @@
         .analysis-title { font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; margin-bottom: 6px; display: flex; justify-content: space-between; }
         .analysis-text { font-size: 0.8rem; line-height: 1.4; color: var(--text-main); }
         .analysis-badge { padding: 2px 6px; border-radius: 3px; font-size: 0.68rem; font-weight: 800; }
-
-        .global-trade-card { background: linear-gradient(145deg, rgba(21, 25, 36, 0.95), rgba(11, 14, 20, 0.98)); border: 1px solid var(--cyan); border-radius: 8px; padding: 14px; margin-top: 15px; }
-        .global-trade-header { font-size: 0.88rem; font-weight: 800; color: var(--cyan); margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
-        .global-trade-type { font-size: 0.75rem; padding: 3px 8px; border-radius: 4px; text-transform: uppercase; font-weight: 900; }
     </style>
 </head>
 <body>
@@ -399,7 +395,7 @@
                     <option value="15m" selected>Temporalidad: 15m</option>
                     <option value="1h">Temporalidad: 1h</option>
                     <option value="4h">Temporalidad: 4h</option>
-                    <option value="1D">Temporalidad: 1D</option>
+                    <option value="1d">Temporalidad: 1D</option>
                 </select>
             </div>
             <div class="panel-body">
@@ -508,7 +504,7 @@
         </section>
     </main>
 
-    <!-- LÓGICA JAVASCRIPT CORREGIDA Y OPTIMIZADA -->
+    <!-- LÓGICA JAVASCRIPT CORREGIDA CON CAMBIO DE TEMPORALIDAD DINÁMICO -->
     <script>
         // VARIABLES GLOBALES
         let chart, candleSeries;
@@ -517,6 +513,7 @@
         let currentPrice = 0;
         let audioEnabled = true;
         let db;
+        let currentInterval = '15m'; // Temporalidad inicial por defecto
 
         const mockMatrixData = [
             { tf: '1m', binance: '60% C', bybit: '55% C', coinbase: '40% V', okx: '50% C' },
@@ -545,7 +542,7 @@
             };
         }
 
-        // 2. CONFIGURACIÓN DEL GRÁFICO LIGHTWEIGHT CHARTS
+        // 2. CONFIGURACIÓN DEL GRÁFICO LIGHTWEIGHT CHARTS Y CARGA DE VELAS
         function initChart() {
             const chartElement = document.getElementById('tv-chart');
             chart = LightweightCharts.createChart(chartElement, {
@@ -562,8 +559,12 @@
                 wickUpColor: '#0ecb81', wickDownColor: '#f6465d'
             });
 
-            // CARGAR VELAS HISTÓRICAS REALES DE BINANCE SPOT (15m)
-            fetch('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=15m&limit=100')
+            loadCandles(currentInterval);
+        }
+
+        // FUNCIÓN PARA CARGAR LAS VELAS DESDE BINANCE SEGÚN LA TEMPORALIDAD SELECCIONADA
+        function loadCandles(interval) {
+            fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${interval}&limit=100`)
                 .then(res => res.json())
                 .then(data => {
                     const klines = data.map(d => ({
@@ -576,18 +577,16 @@
                     candleSeries.setData(klines);
                     chart.timeScale().fitContent();
                 })
-                .catch(err => console.error("Error al cargar velas reales:", err));
+                .catch(err => console.error("Error al cargar velas de Binance:", err));
         }
 
         // 3. DIBUJAR NIVELES DE SOPORTE Y RESISTENCIA DE BALLENAS EN EL GRÁFICO
         function drawWhaleLevels(buyLevels, sellLevels) {
-            // Limpiar líneas anteriores
             whaleLines.forEach(line => {
                 try { candleSeries.removePriceLine(line); } catch(e){}
             });
             whaleLines = [];
 
-            // Trazar los mejores 2 niveles de soporte (compras)
             buyLevels.slice(0, 2).forEach(item => {
                 const line = candleSeries.createPriceLine({
                     price: parseFloat(item.price),
@@ -600,7 +599,6 @@
                 whaleLines.push(line);
             });
 
-            // Trazar los mejores 2 niveles de resistencia (ventas)
             sellLevels.slice(0, 2).forEach(item => {
                 const line = candleSeries.createPriceLine({
                     price: parseFloat(item.price),
@@ -616,9 +614,6 @@
 
         // 4. PROCESAR ORDENES Y ACTUALIZAR DIBUJO DENTRO DEL LIBRO
         function updateWhaleLevelsFromData(asks, bids) {
-            // Umbral ajustado para nivel de profundidad en directo
-            const WHALE_THRESHOLD = 0.8;
-
             const whaleBids = bids.map(b => ({ price: parseFloat(b[0]), qty: parseFloat(b[1]) }))
                                   .sort((a,b) => b.qty - a.qty);
 
@@ -627,7 +622,6 @@
 
             drawWhaleLevels(whaleBids, whaleAsks);
 
-            // Registrar en base de datos si la orden es realmente relevante (>= 1.5 BTC)
             whaleBids.filter(b => b.qty >= 1.5).forEach(b => saveWhaleOrder('BUY', b.price, b.qty));
             whaleAsks.filter(a => a.qty >= 1.5).forEach(a => saveWhaleOrder('SELL', a.price, a.qty));
         }
@@ -689,13 +683,15 @@
             tx.oncomplete = () => renderWhaleHistoryUI();
         }
 
-        // 6. RENDERIZADO DE TABLA MULTI-BROKER
+        // 6. RENDERIZADO DE TABLA MULTI-BROKER Y RESALTADO
         function renderMatrixTable() {
             const tbody = document.getElementById('matrix-tbody');
             tbody.innerHTML = '';
             mockMatrixData.forEach(row => {
                 const tr = document.createElement('tr');
-                if (row.tf === '15m') tr.className = 'row-active';
+                if (row.tf.toLowerCase() === currentInterval.toLowerCase()) {
+                    tr.className = 'row-active';
+                }
                 tr.innerHTML = `
                     <td style="font-weight: 800; color: var(--yellow);">${row.tf}</td>
                     <td><span class="cell-buy">${row.binance}</span></td>
@@ -707,7 +703,7 @@
             });
         }
 
-        // 7. LÓGICA DE DIBUJO MANUAL
+        // 7. LÓGICA DE DIBUJO MANUAL Y CAMBIO DE TEMPORALIDAD
         function addManualLine(type) {
             const val = parseFloat(document.getElementById('manual-price-input').value);
             if (!val) return;
@@ -734,9 +730,19 @@
             document.getElementById('whale-sound-btn').innerText = `🔊 Audio Ballenas: ${audioEnabled ? 'ON' : 'OFF'}`;
         }
 
+        // CAMBIO DINÁMICO DE TEMPORALIDAD
         function onTimeframeChange() {
-            const tf = document.getElementById('tf-analysis-select').value;
-            document.querySelectorAll('.selected-tf-tag').forEach(el => el.innerText = tf);
+            const selectEl = document.getElementById('tf-analysis-select');
+            currentInterval = selectEl.value;
+
+            // Actualizar etiquetas en la interfaz
+            document.querySelectorAll('.selected-tf-tag').forEach(el => el.innerText = currentInterval);
+
+            // Cargar datos históricos de velas de la nueva temporalidad en el gráfico
+            loadCandles(currentInterval);
+
+            // Actualizar resaltado de la matriz
+            renderMatrixTable();
         }
 
         // 8. CONEXIÓN WEBSOCKET BINANCE SPOT
@@ -825,9 +831,18 @@
                     document.getElementById('opt-sl').innerText = `$${(currentPrice * 0.992).toFixed(2)}`;
                     document.getElementById('opt-tp1').innerText = `$${(currentPrice * 1.016).toFixed(2)}`;
 
+                    // CONVERSIÓN DE INTERVALO A SEGUNDOS PARA LA VELA EN VIVO
+                    let tfSeconds = 900;
+                    if (currentInterval === '1m') tfSeconds = 60;
+                    else if (currentInterval === '5m') tfSeconds = 300;
+                    else if (currentInterval === '15m') tfSeconds = 900;
+                    else if (currentInterval === '1h') tfSeconds = 3600;
+                    else if (currentInterval === '4h') tfSeconds = 14400;
+                    else if (currentInterval === '1d') tfSeconds = 86400;
+
                     const nowSec = Math.floor(Date.now() / 1000);
                     candleSeries.update({
-                        time: nowSec - (nowSec % 900),
+                        time: nowSec - (nowSec % tfSeconds),
                         open: currentPrice,
                         high: currentPrice + 5,
                         low: currentPrice - 5,
@@ -851,19 +866,35 @@
             };
         }
 
+        // CONTADOR DE CIERRE DE VELA SEGÚN LA TEMPORALIDAD
         function startCandleTimer() {
             setInterval(() => {
-                const now = new Date();
-                const seconds = now.getSeconds();
-                const minutes = now.getMinutes() % 15;
-                const remMin = 14 - minutes;
-                const remSec = 59 - seconds;
+                let totalSecs = 900;
+                if (currentInterval === '1m') totalSecs = 60;
+                else if (currentInterval === '5m') totalSecs = 300;
+                else if (currentInterval === '15m') totalSecs = 900;
+                else if (currentInterval === '1h') totalSecs = 3600;
+                else if (currentInterval === '4h') totalSecs = 14400;
+                else if (currentInterval === '1d') totalSecs = 86400;
 
-                const formatted = `${String(remMin).padStart(2, '0')}:${String(remSec).padStart(2, '0')}`;
+                const nowSecs = Math.floor(Date.now() / 1000);
+                const remSecsTotal = totalSecs - (nowSecs % totalSecs);
+
+                const hrs = Math.floor(remSecsTotal / 3600);
+                const mins = Math.floor((remSecsTotal % 3600) / 60);
+                const secs = remSecsTotal % 60;
+
+                let formatted = "";
+                if (hrs > 0) {
+                    formatted = `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+                } else {
+                    formatted = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+                }
+
                 document.getElementById('candle-timer-val').innerText = formatted;
 
-                const elapsedTotal = (minutes * 60) + seconds;
-                const pct = (elapsedTotal / 900) * 100;
+                const elapsed = totalSecs - remSecsTotal;
+                const pct = (elapsed / totalSecs) * 100;
                 document.getElementById('candle-timer-bar').style.width = `${pct}%`;
             }, 1000);
         }
