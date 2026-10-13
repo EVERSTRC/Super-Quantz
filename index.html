@@ -504,7 +504,7 @@
         </section>
     </main>
 
-    <!-- LÓGICA JAVASCRIPT CON CÁLCULO PROMEDIADO DE NIVELES POR TEMPORALIDAD -->
+    <!-- LÓGICA JAVASCRIPT CON FILTRO HISTÓRICO CORREGIDO -->
     <script>
         let chart, candleSeries;
         let drawnLines = [];
@@ -513,6 +513,7 @@
         let audioEnabled = true;
         let db;
         let currentInterval = '15m';
+        let lastSavedTimestamp = 0; // Control para no saturar IndexedDB
 
         const mockMatrixData = [
             { tf: '1m', binance: '60% C', bybit: '55% C', coinbase: '40% V', okx: '50% C' },
@@ -530,8 +531,6 @@
                 if (!db.objectStoreNames.contains("whaleOrders")) {
                     const store = db.createObjectStore("whaleOrders", { keyPath: "id", autoIncrement: true });
                     store.createIndex("timestamp", "timestamp", { unique: false });
-                    store.createIndex("type", "type", { unique: false });
-                    store.createIndex("price", "price", { unique: false });
                 }
             };
             request.onsuccess = (e) => {
@@ -559,7 +558,6 @@
             loadCandles(currentInterval);
         }
 
-        // CARGAR VELAS Y CÁLCULO DE NIVELES PROMEDIADOS POR VOLUMEN SEGÚN TEMPORALIDAD
         function loadCandles(interval) {
             fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${interval}&limit=100`)
                 .then(res => res.json())
@@ -576,35 +574,29 @@
                     candleSeries.setData(klines);
                     chart.timeScale().fitContent();
 
-                    // PROMEDIADO PONDERADO POR VOLUMEN DE SOPORTES Y RESISTENCIAS
                     calculateAveragedLevels(klines, interval);
                 })
-                .catch(err => console.error("Error al cargar velas de Binance:", err));
+                .catch(err => console.error("Error al cargar velas:", err));
         }
 
-        // CÁLCULO Y DIBUJO DE SOPORTES Y RESISTENCIAS PROMEDIADOS
         function calculateAveragedLevels(klines, interval) {
             if (!klines || klines.length === 0) return;
 
-            // Limpiar líneas anteriores
             whaleLines.forEach(line => {
                 try { candleSeries.removePriceLine(line); } catch(e){}
             });
             whaleLines = [];
 
-            // Dividir velas en zonas por encima y por debajo del precio actual
             const lastClose = klines[klines.length - 1].close;
 
             let totalSupVol = 0, weightedSupPrice = 0;
             let totalResVol = 0, weightedResPrice = 0;
 
             klines.forEach(k => {
-                // Si el mínimo es menor al precio actual -> Zona de Soporte
                 if (k.low < lastClose) {
                     weightedSupPrice += k.low * k.volume;
                     totalSupVol += k.volume;
                 }
-                // Si el máximo es mayor al precio actual -> Zona de Resistencia
                 if (k.high > lastClose) {
                     weightedResPrice += k.high * k.volume;
                     totalResVol += k.volume;
@@ -614,7 +606,6 @@
             const avgSupport = totalSupVol > 0 ? (weightedSupPrice / totalSupVol) : (lastClose * 0.99);
             const avgResistance = totalResVol > 0 ? (weightedResPrice / totalResVol) : (lastClose * 1.01);
 
-            // Trazar línea de Soporte Promediado
             const supLine = candleSeries.createPriceLine({
                 price: avgSupport,
                 color: '#0ecb81',
@@ -625,7 +616,6 @@
             });
             whaleLines.push(supLine);
 
-            // Trazar línea de Resistencia Promediada
             const resLine = candleSeries.createPriceLine({
                 price: avgResistance,
                 color: '#f6465d',
@@ -637,14 +627,20 @@
             whaleLines.push(resLine);
         }
 
+        // GUARDADO EN INDEXEDDB CON CONTROL DE INTERVALO (Evita duplicados excesivos)
         function saveWhaleOrder(type, price, qty) {
             if (!db) return;
+            const now = Date.now();
+            if (now - lastSavedTimestamp < 1000) return; // Máximo 1 registro por segundo
+            lastSavedTimestamp = now;
+
             const tx = db.transaction("whaleOrders", "readwrite");
             const store = tx.objectStore("whaleOrders");
-            store.add({ type, price: parseFloat(price), qty: parseFloat(qty), timestamp: Date.now() });
+            store.add({ type, price: parseFloat(price), qty: parseFloat(qty), timestamp: now });
             tx.oncomplete = () => renderWhaleHistoryUI();
         }
 
+        // FILTRO HISTÓRICO BALLENAS CORREGIDO
         function renderWhaleHistoryUI() {
             if (!db) return;
             const filter = document.getElementById("time-filter-select").value;
@@ -656,26 +652,41 @@
                 let records = req.result || [];
                 const now = Date.now();
 
-                if (filter === "1h") records = records.filter(r => (now - r.timestamp) <= 3600000);
-                else if (filter === "24h") records = records.filter(r => (now - r.timestamp) <= 86400000);
+                // Filtrado por timestamp real
+                if (filter === "1h") {
+                    records = records.filter(r => (now - r.timestamp) <= 3600000);
+                } else if (filter === "24h") {
+                    records = records.filter(r => (now - r.timestamp) <= 86400000);
+                }
+
+                // Ordenar del más reciente al más antiguo
+                records.sort((a, b) => b.timestamp - a.timestamp);
 
                 let buyVol = 0, sellVol = 0;
                 const listEl = document.getElementById("whale-log-list");
                 listEl.innerHTML = "";
 
-                records.slice(-20).reverse().forEach(item => {
+                records.forEach(item => {
                     if (item.type === 'BUY') buyVol += item.qty;
                     else sellVol += item.qty;
+                });
 
+                // Mostrar últimos 25 registros en pantalla
+                records.slice(0, 25).forEach(item => {
                     const row = document.createElement("div");
                     row.className = "whale-log-item";
                     const col = item.type === 'BUY' ? 'var(--green)' : 'var(--red)';
-                    row.innerHTML = `<span>${new Date(item.timestamp).toLocaleTimeString()}</span><span style="color:${col}">${item.type} ${item.qty.toFixed(2)} BTC</span><span>$${item.price.toFixed(2)}</span>`;
+                    row.innerHTML = `
+                        <span>${new Date(item.timestamp).toLocaleTimeString()}</span>
+                        <span style="color:${col}; font-weight: bold;">${item.type} ${item.qty.toFixed(2)} BTC</span>
+                        <span>$${item.price.toFixed(2)}</span>
+                    `;
                     listEl.appendChild(row);
                 });
 
                 document.getElementById("wh-hist-buy-vol").innerText = `${buyVol.toFixed(2)} BTC`;
                 document.getElementById("wh-hist-sell-vol").innerText = `${sellVol.toFixed(2)} BTC`;
+                
                 const netDelta = buyVol - sellVol;
                 const deltaEl = document.getElementById("wh-hist-delta-val");
                 deltaEl.innerText = `${netDelta >= 0 ? '+' : ''}${netDelta.toFixed(2)} BTC`;
@@ -744,9 +755,7 @@
 
             document.querySelectorAll('.selected-tf-tag').forEach(el => el.innerText = currentInterval);
 
-            // Recargar velas y recalcular niveles promediados automáticamente
             loadCandles(currentInterval);
-
             renderMatrixTable();
         }
 
@@ -856,7 +865,7 @@
                 if (data.asks && data.bids) {
                     renderOrderBookUI(data.asks, data.bids);
 
-                    // Registrar transacciones ballena mayores a 1.5 BTC
+                    // Registrar transacciones grandes en la base de datos con throttle
                     data.bids.filter(b => parseFloat(b[1]) >= 1.5).forEach(b => saveWhaleOrder('BUY', parseFloat(b[0]), parseFloat(b[1])));
                     data.asks.filter(a => parseFloat(a[1]) >= 1.5).forEach(a => saveWhaleOrder('SELL', parseFloat(a[0]), parseFloat(a[1])));
 
