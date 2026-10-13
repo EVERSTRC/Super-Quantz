@@ -453,7 +453,7 @@
                     </div>
                     <div class="metric-card">
                         <div class="lbl">Soportes/Resistencias Ballena</div>
-                        <div class="val" id="whale-levels-val" style="color: var(--cyan);">Promediado TF</div>
+                        <div class="val" id="whale-levels-val" style="color: var(--cyan);">Multi-Timeframe</div>
                     </div>
                     <div class="metric-card">
                         <div class="lbl">Fuerza Dom. Compradores</div>
@@ -504,7 +504,7 @@
         </section>
     </main>
 
-    <!-- LÓGICA JAVASCRIPT CON FILTRO HISTÓRICO CORREGIDO -->
+    <!-- LÓGICA JAVASCRIPT CON SOPORTES Y RESISTENCIAS MULTITEMPORALIDAD SIMULTÁNEOS -->
     <script>
         let chart, candleSeries;
         let drawnLines = [];
@@ -513,7 +513,7 @@
         let audioEnabled = true;
         let db;
         let currentInterval = '15m';
-        let lastSavedTimestamp = 0; // Control para no saturar IndexedDB
+        let lastSavedTimestamp = 0;
 
         const mockMatrixData = [
             { tf: '1m', binance: '60% C', bybit: '55% C', coinbase: '40% V', okx: '50% C' },
@@ -574,64 +574,86 @@
                     candleSeries.setData(klines);
                     chart.timeScale().fitContent();
 
-                    calculateAveragedLevels(klines, interval);
+                    // Cargar soportes y resistencias de MÚLTIPLES TEMPORALIDADES SIMULTÁNEAMENTE
+                    loadMultiTimeframeLevels();
                 })
                 .catch(err => console.error("Error al cargar velas:", err));
         }
 
-        function calculateAveragedLevels(klines, interval) {
-            if (!klines || klines.length === 0) return;
-
+        // MOTOR MULTI-TEMPORALIDAD: CALCULA LÍNEAS PARA 15m, 1h, 4h y 1d EN PARALELO
+        function loadMultiTimeframeLevels() {
+            // Limpiar líneas anteriores del gráfico
             whaleLines.forEach(line => {
                 try { candleSeries.removePriceLine(line); } catch(e){}
             });
             whaleLines = [];
 
-            const lastClose = klines[klines.length - 1].close;
+            const timeframes = [
+                { tf: '15m', style: LightweightCharts.LineStyle.Dotted, width: 1 },
+                { tf: '1h', style: LightweightCharts.LineStyle.Dashed, width: 1 },
+                { tf: '4h', style: LightweightCharts.LineStyle.Solid, width: 2 },
+                { tf: '1d', style: LightweightCharts.LineStyle.Solid, width: 3 }
+            ];
 
-            let totalSupVol = 0, weightedSupPrice = 0;
-            let totalResVol = 0, weightedResPrice = 0;
+            timeframes.forEach(tfObj => {
+                fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${tfObj.tf}&limit=100`)
+                    .then(res => res.json())
+                    .then(data => {
+                        const klines = data.map(d => ({
+                            high: parseFloat(d[2]),
+                            low: parseFloat(d[3]),
+                            close: parseFloat(d[4]),
+                            volume: parseFloat(d[5])
+                        }));
 
-            klines.forEach(k => {
-                if (k.low < lastClose) {
-                    weightedSupPrice += k.low * k.volume;
-                    totalSupVol += k.volume;
-                }
-                if (k.high > lastClose) {
-                    weightedResPrice += k.high * k.volume;
-                    totalResVol += k.volume;
-                }
+                        const lastClose = klines[klines.length - 1].close;
+                        let totalSupVol = 0, weightedSupPrice = 0;
+                        let totalResVol = 0, weightedResPrice = 0;
+
+                        klines.forEach(k => {
+                            if (k.low < lastClose) {
+                                weightedSupPrice += k.low * k.volume;
+                                totalSupVol += k.volume;
+                            }
+                            if (k.high > lastClose) {
+                                weightedResPrice += k.high * k.volume;
+                                totalResVol += k.volume;
+                            }
+                        });
+
+                        const avgSup = totalSupVol > 0 ? (weightedSupPrice / totalSupVol) : (lastClose * 0.99);
+                        const avgRes = totalResVol > 0 ? (weightedResPrice / totalResVol) : (lastClose * 1.01);
+
+                        // Trazar línea de Soporte para este Timeframe
+                        const supLine = candleSeries.createPriceLine({
+                            price: avgSup,
+                            color: '#0ecb81',
+                            lineWidth: tfObj.width,
+                            lineStyle: tfObj.style,
+                            axisLabelVisible: true,
+                            title: `SUP (${tfObj.tf}): $${avgSup.toFixed(2)}`
+                        });
+                        whaleLines.push(supLine);
+
+                        // Trazar línea de Resistencia para este Timeframe
+                        const resLine = candleSeries.createPriceLine({
+                            price: avgRes,
+                            color: '#f6465d',
+                            lineWidth: tfObj.width,
+                            lineStyle: tfObj.style,
+                            axisLabelVisible: true,
+                            title: `RES (${tfObj.tf}): $${avgRes.toFixed(2)}`
+                        });
+                        whaleLines.push(resLine);
+                    })
+                    .catch(err => console.error(`Error calculando niveles para ${tfObj.tf}:`, err));
             });
-
-            const avgSupport = totalSupVol > 0 ? (weightedSupPrice / totalSupVol) : (lastClose * 0.99);
-            const avgResistance = totalResVol > 0 ? (weightedResPrice / totalResVol) : (lastClose * 1.01);
-
-            const supLine = candleSeries.createPriceLine({
-                price: avgSupport,
-                color: '#0ecb81',
-                lineWidth: 2,
-                lineStyle: LightweightCharts.LineStyle.Solid,
-                axisLabelVisible: true,
-                title: `🐳 SUP PROM (${interval}): $${avgSupport.toFixed(2)}`
-            });
-            whaleLines.push(supLine);
-
-            const resLine = candleSeries.createPriceLine({
-                price: avgResistance,
-                color: '#f6465d',
-                lineWidth: 2,
-                lineStyle: LightweightCharts.LineStyle.Solid,
-                axisLabelVisible: true,
-                title: `🐳 RES PROM (${interval}): $${avgResistance.toFixed(2)}`
-            });
-            whaleLines.push(resLine);
         }
 
-        // GUARDADO EN INDEXEDDB CON CONTROL DE INTERVALO (Evita duplicados excesivos)
         function saveWhaleOrder(type, price, qty) {
             if (!db) return;
             const now = Date.now();
-            if (now - lastSavedTimestamp < 1000) return; // Máximo 1 registro por segundo
+            if (now - lastSavedTimestamp < 1000) return;
             lastSavedTimestamp = now;
 
             const tx = db.transaction("whaleOrders", "readwrite");
@@ -640,7 +662,6 @@
             tx.oncomplete = () => renderWhaleHistoryUI();
         }
 
-        // FILTRO HISTÓRICO BALLENAS CORREGIDO
         function renderWhaleHistoryUI() {
             if (!db) return;
             const filter = document.getElementById("time-filter-select").value;
@@ -652,14 +673,12 @@
                 let records = req.result || [];
                 const now = Date.now();
 
-                // Filtrado por timestamp real
                 if (filter === "1h") {
                     records = records.filter(r => (now - r.timestamp) <= 3600000);
                 } else if (filter === "24h") {
                     records = records.filter(r => (now - r.timestamp) <= 86400000);
                 }
 
-                // Ordenar del más reciente al más antiguo
                 records.sort((a, b) => b.timestamp - a.timestamp);
 
                 let buyVol = 0, sellVol = 0;
@@ -671,7 +690,6 @@
                     else sellVol += item.qty;
                 });
 
-                // Mostrar últimos 25 registros en pantalla
                 records.slice(0, 25).forEach(item => {
                     const row = document.createElement("div");
                     row.className = "whale-log-item";
@@ -865,7 +883,6 @@
                 if (data.asks && data.bids) {
                     renderOrderBookUI(data.asks, data.bids);
 
-                    // Registrar transacciones grandes en la base de datos con throttle
                     data.bids.filter(b => parseFloat(b[1]) >= 1.5).forEach(b => saveWhaleOrder('BUY', parseFloat(b[0]), parseFloat(b[1])));
                     data.asks.filter(a => parseFloat(a[1]) >= 1.5).forEach(a => saveWhaleOrder('SELL', parseFloat(a[0]), parseFloat(a[1])));
 
