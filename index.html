@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Quantz IA - Terminal Multiexchange & MTF Pro</title>
+    <title>Quantz IA - Terminal Multiexchange & MTF Auto-Filter Pro</title>
     <!-- LIBRERÍA LIGHTWEIGHT CHARTS (TRADINGVIEW) -->
     <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
     <style>
@@ -58,7 +58,7 @@
         .timer-progress-bg { width: 100%; height: 4px; background-color: var(--border-color); border-radius: 2px; overflow: hidden; }
         .timer-progress-fill { height: 100%; width: 0%; background: linear-gradient(90deg, var(--blue), var(--cyan)); transition: width 0.3s linear; }
 
-        /* BANNER RESUMEN MULTI-TIMEFRAME (MTF) */
+        /* BANNER RESUMEN MULTI-TIMEFRAME (MTF) CON AUTO-FILTRO */
         .mtf-status-bar {
             position: absolute;
             top: 12px;
@@ -307,8 +307,8 @@
                             </div>
                             <div style="border-right: 1px solid var(--border-color); height: 18px;"></div>
                             <div class="mtf-item">
-                                <span class="mtf-label">3. Disparo (1m/5m)</span>
-                                <span class="mtf-val" id="mtf-trigger-val" style="color: var(--yellow);">ESPERANDO</span>
+                                <span class="mtf-label">3. Auto-Filtro Disparo</span>
+                                <span class="mtf-val" id="mtf-trigger-val" style="color: var(--yellow);">SOLO BUY 🟢</span>
                             </div>
                         </div>
 
@@ -483,9 +483,9 @@
                     </div>
                 </div>
 
-                <!-- TARJETA DINÁMICA DE SEÑAL AUTOMÁTICA EN TIEMPO REAL -->
+                <!-- TARJETA DINÁMICA DE SEÑAL AUTOMÁTICA CON FILTRO DUAL MTF -->
                 <div class="signal-alert-card signal-wait" id="signal-card">
-                    <div class="signal-header">⚡ MÓDULO DE SEÑAL CERTERA BALLENA (MTF CONFLUENCE)</div>
+                    <div class="signal-header">⚡ MÓDULO DE SEÑAL AUTO-FILTRADA (ANTI-PARPADEO)</div>
                     <div class="signal-action" id="signal-action-text">ESPERANDO CONFLUENCIA...</div>
                     <div style="font-size: 0.75rem; color: var(--text-muted);" id="signal-reason-text">
                         Evaluando alineación MTF: Macro (1h) + Estructura (15m) + Disparo (1m/5m).
@@ -589,7 +589,7 @@
         </section>
     </main>
 
-    <!-- LÓGICA JAVASCRIPT CON IMPLEMENTACIÓN ESTRATÉGICA MULTI-TIMEFRAME (MTF) -->
+    <!-- LÓGICA JAVASCRIPT CON AUTO-FILTRO Y BLOQUEO AUTOMÁTICO DE RUIDO -->
     <script>
         let chart, candleSeries;
         let drawnLines = [];
@@ -608,6 +608,7 @@
         let activeResistances = [];
         let audioCtx = null;
         let wsKline = null, wsMarket = null;
+        let macroBias = 'BULLISH'; // Sesgo Macro Automático (BULLISH, BEARISH, NEUTRAL)
 
         const mockMatrixData = [
             { tf: '1m', binance: '60% C', bybit: '55% C', coinbase: '40% V', okx: '50% C' },
@@ -874,59 +875,68 @@
 
             const mtfMacro = document.getElementById('mtf-macro-val');
             const mtfStruct = document.getElementById('mtf-struct-val');
+            const mtfTrigger = document.getElementById('mtf-trigger-val');
 
-            if (bullScore >= 65) {
+            if (bullScore >= 60) {
+                macroBias = 'BULLISH';
                 decisionText.innerText = "COMPRA FUERTE (LONG)";
                 decisionText.style.color = "var(--green)";
                 buyStatus.innerText = "CONFIRMADO 🟢";
                 buyStatus.style.color = "var(--green)";
                 sellStatus.innerText = "INVALIDADO 🔴";
                 sellStatus.style.color = "var(--red)";
-                summaryNote.innerText = "Presión compradora predominante con acumulación institucional.";
+                summaryNote.innerText = "Presión compradora con acumulación de ballenas.";
 
                 mtfMacro.innerText = "ALCISTA";
                 mtfMacro.style.color = "var(--green)";
                 mtfStruct.innerText = "ALCISTA";
                 mtfStruct.style.color = "var(--green)";
-            } else if (bearScore >= 65) {
+                mtfTrigger.innerText = "SOLO BUY 🟢";
+                mtfTrigger.style.color = "var(--green)";
+            } else if (bearScore >= 60) {
+                macroBias = 'BEARISH';
                 decisionText.innerText = "VENTA FUERTE (SHORT)";
                 decisionText.style.color = "var(--red)";
                 buyStatus.innerText = "INVALIDADO 🔴";
                 buyStatus.style.color = "var(--red)";
                 sellStatus.innerText = "CONFIRMADO 🟢";
                 sellStatus.style.color = "var(--green)";
-                summaryNote.innerText = "Presión vendedora activa en el libro de órdenes y flujo de ballenas.";
+                summaryNote.innerText = "Presión vendedora activa en flujo de ballenas.";
 
                 mtfMacro.innerText = "BAJISTA";
                 mtfMacro.style.color = "var(--red)";
                 mtfStruct.innerText = "BAJISTA";
                 mtfStruct.style.color = "var(--red)";
+                mtfTrigger.innerText = "SOLO SELL 🔴";
+                mtfTrigger.style.color = "var(--red)";
             } else {
+                macroBias = 'NEUTRAL';
                 decisionText.innerText = "MERCADO NEUTRAL / CONSOLIDACIÓN";
                 decisionText.style.color = "var(--yellow)";
                 buyStatus.innerText = "EN ESPERA 🟡";
                 buyStatus.style.color = "var(--yellow)";
                 sellStatus.innerText = "EN ESPERA 🟡";
                 sellStatus.style.color = "var(--yellow)";
-                summaryNote.innerText = "Mercado en equilibrio. Esperando confirmación de ruptura o volumen de ballenas.";
+                summaryNote.innerText = "Mercado en equilibrio. Auto-filtro conteniendo señales de falso rompimiento.";
 
                 mtfMacro.innerText = "NEUTRAL";
                 mtfMacro.style.color = "var(--yellow)";
                 mtfStruct.innerText = "NEUTRAL";
                 mtfStruct.style.color = "var(--yellow)";
+                mtfTrigger.innerText = "BLOQUEADO 🔒";
+                mtfTrigger.style.color = "var(--yellow)";
             }
 
             processSignalEngine();
         }
 
-        // MOTOR DE SEÑALES MULTI-TIMEFRAME (MTF) CON DISPARO DE PRECISIÓN
+        // MOTOR DE SEÑALES AUTOMÁTICO CON FILTRO ANTI-PARPADEO
         function processSignalEngine() {
             if (currentPrice === 0 || activeSupports.length === 0 || !currentCandle) return;
 
             const card = document.getElementById('signal-card');
             const actionText = document.getElementById('signal-action-text');
             const reasonText = document.getElementById('signal-reason-text');
-            const mtfTrigger = document.getElementById('mtf-trigger-val');
 
             const validSupports = activeSupports.filter(s => s <= currentPrice);
             const validResistances = activeResistances.filter(r => r >= currentPrice);
@@ -939,18 +949,15 @@
 
             const THRESHOLD_DIST = 0.20;
 
-            // DISPARO 1: COMPRA MULTI-TIMEFRAME (Rango Micro 1m/5m + Estructura 15m + Flujo Ballena)
-            if (distToSupPct <= THRESHOLD_DIST && currentBidPct >= 58 && currentNetDelta >= 0) {
+            // DISPARO AUTOMÁTICO DE COMPRA: Exige confluencia Macro ALCISTA + Cobre en Soporte + CVD Comprador
+            if (macroBias === 'BULLISH' && distToSupPct <= THRESHOLD_DIST && currentBidPct >= 55 && currentNetDelta >= 0) {
                 card.className = "signal-alert-card signal-buy";
-                actionText.innerText = "🚀 COMPRA (BUY LONG)";
-                reasonText.innerText = `Rechazo en Soporte Ballena ($${nearestSup.toFixed(2)}) con ${currentBidPct.toFixed(1)}% de Dominio Comprador y CVD positivo.`;
+                actionText.innerText = "🚀 COMPRA CONFIRMADA (BUY LONG)";
+                reasonText.innerText = `🟢 Filtro Pasado: Tendencia Macro Alcista + Rechazo en Soporte ($${nearestSup.toFixed(2)}) + CVD Ballenas (${currentNetDelta.toFixed(1)} BTC).`;
                 
                 document.getElementById('sig-entry').innerText = `$${currentPrice.toFixed(2)}`;
                 document.getElementById('sig-sl').innerText = `$${(nearestSup * 0.997).toFixed(2)}`;
                 document.getElementById('sig-tp').innerText = `$${(currentPrice + (currentPrice - nearestSup * 0.997) * 2).toFixed(2)}`;
-
-                mtfTrigger.innerText = "COMPRA (BUY)";
-                mtfTrigger.style.color = "var(--green)";
 
                 if (lastSignalType !== 'BUY') {
                     lastSignalType = 'BUY';
@@ -960,23 +967,20 @@
                         position: 'belowBar',
                         color: '#0ecb81',
                         shape: 'arrowUp',
-                        text: 'BUY 🟢'
+                        text: 'AUTO BUY 🟢'
                     });
                     candleSeries.setMarkers(chartMarkers);
                 }
             } 
-            // DISPARO 2: VENTA MULTI-TIMEFRAME (Rango Micro 1m/5m + Estructura 15m + Flujo Ballena)
-            else if (distToResPct <= THRESHOLD_DIST && currentBidPct <= 42 && currentNetDelta <= 0) {
+            // DISPARO AUTOMÁTICO DE VENTA: Exige confluencia Macro BAJISTA + Cobre en Resistencia + CVD Vendedor
+            else if (macroBias === 'BEARISH' && distToResPct <= THRESHOLD_DIST && currentBidPct <= 45 && currentNetDelta <= 0) {
                 card.className = "signal-alert-card signal-sell";
-                actionText.innerText = "🔻 VENTA (SELL SHORT)";
-                reasonText.innerText = `Rechazo en Resistencia Ballena ($${nearestRes.toFixed(2)}) con presión vendedora del ${(100 - currentBidPct).toFixed(1)}% y CVD negativo.`;
+                actionText.innerText = "🔻 VENTA CONFIRMADA (SELL SHORT)";
+                reasonText.innerText = `🔴 Filtro Pasado: Tendencia Macro Bajista + Rechazo en Resistencia ($${nearestRes.toFixed(2)}) + CVD Vendedor (${currentNetDelta.toFixed(1)} BTC).`;
                 
                 document.getElementById('sig-entry').innerText = `$${currentPrice.toFixed(2)}`;
                 document.getElementById('sig-sl').innerText = `$${(nearestRes * 1.003).toFixed(2)}`;
                 document.getElementById('sig-tp').innerText = `$${(currentPrice - (nearestRes * 1.003 - currentPrice) * 2).toFixed(2)}`;
-
-                mtfTrigger.innerText = "VENTA (SELL)";
-                mtfTrigger.style.color = "var(--red)";
 
                 if (lastSignalType !== 'SELL') {
                     lastSignalType = 'SELL';
@@ -986,22 +990,27 @@
                         position: 'aboveBar',
                         color: '#f6465d',
                         shape: 'arrowDown',
-                        text: 'SELL 🔴'
+                        text: 'AUTO SELL 🔴'
                     });
                     candleSeries.setMarkers(chartMarkers);
                 }
             } 
-            // SIN CONFLUENCIA DE DISPARO
+            // SI INTENTA PARPADEAR UNA SEÑAL CONTRARIA A LA MACRO, EL AUTO-FILTRO LA BLOQUEA SILENCIOSAMENTE
             else {
                 card.className = "signal-alert-card signal-wait";
-                actionText.innerText = "ESPERANDO CONFLUENCIA...";
-                reasonText.innerText = "Esperando alineación de Soporte/Resistencia Ballena, Order Book y CVD.";
+                actionText.innerText = "🛡️ AUTO-FILTRO ACTIVO (FILTRANDO RUIDO)";
+                
+                if (macroBias === 'BULLISH') {
+                    reasonText.innerText = "Bloqueando entradas en VENTA (Shorts). Solo buscando retesteos al soporte para COMPRA.";
+                } else if (macroBias === 'BEARISH') {
+                    reasonText.innerText = "Bloqueando entradas en COMPRA (Longs). Solo buscando retesteos a resistencia para VENTA.";
+                } else {
+                    reasonText.innerText = "Mercado sin confluencia clara. Módulo en reposo evitando falsas rupturas.";
+                }
+
                 document.getElementById('sig-entry').innerText = `$${currentPrice.toFixed(2)}`;
                 document.getElementById('sig-sl').innerText = "$0.00";
                 document.getElementById('sig-tp').innerText = "$0.00";
-
-                mtfTrigger.innerText = "ESPERANDO";
-                mtfTrigger.style.color = "var(--yellow)";
             }
         }
 
