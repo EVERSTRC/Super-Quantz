@@ -550,11 +550,12 @@
         </section>
     </main>
 
-    <!-- LÓGICA JAVASCRIPT CON WEBSOCKETS SEPARADOS Y RECONEXIÓN AUTOMÁTICA -->
+    <!-- LÓGICA JAVASCRIPT CON LÍNEA INSTITUCIONAL AGREGADA DIRECTAMENTE AL GRÁFICO -->
     <script>
         let chart, candleSeries;
         let drawnLines = [];
         let whaleLines = [];
+        let institutionalLine = null; // Línea de Tendencia Institucional
         let chartMarkers = [];
         let lastSignalType = null;
         let currentPrice = 0;
@@ -728,6 +729,11 @@
             activeSupports = [];
             activeResistances = [];
 
+            if (institutionalLine) {
+                try { candleSeries.removePriceLine(institutionalLine); } catch(e){}
+                institutionalLine = null;
+            }
+
             const timeframes = [
                 { tf: '1m',  supCol: '#00e5ff', resCol: '#ff0055', style: LightweightCharts.LineStyle.Dotted, width: 1 },
                 { tf: '5m',  supCol: '#76ff03', resCol: '#ff3d00', style: LightweightCharts.LineStyle.Dotted, width: 1 },
@@ -736,6 +742,8 @@
                 { tf: '4h',  supCol: '#00b0ff', resCol: '#d500f9', style: LightweightCharts.LineStyle.Solid,  width: 2 },
                 { tf: '1d',  supCol: '#ffea00', resCol: '#ff6d00', style: LightweightCharts.LineStyle.Solid,  width: 3 }
             ];
+
+            let loadedCount = 0;
 
             timeframes.forEach(tfObj => {
                 fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${tfObj.tf}&limit=100`)
@@ -778,8 +786,31 @@
                             price: avgRes, color: tfObj.resCol, lineWidth: tfObj.width, lineStyle: tfObj.style, axisLabelVisible: true, title: `RES (${tfObj.tf}): $${avgRes.toFixed(2)}`
                         });
                         whaleLines.push(resLine);
+
+                        loadedCount++;
+                        // Dibuja la línea de Tendencia Institucional Alcista al finalizar el cálculo de niveles
+                        if (loadedCount === timeframes.length) {
+                            renderInstitutionalLine();
+                        }
                     })
                     .catch(err => console.error(`Error calculando niveles para ${tfObj.tf}:`, err));
+            });
+        }
+
+        // FUNCIÓN QUE GENERA LA LÍNEA DE TENDENCIA INSTITUCIONAL ALCISTA DIRECTAMENTE EN EL GRÁFICO
+        function renderInstitutionalLine() {
+            if (activeSupports.length === 0) return;
+
+            // Calcula el nivel de soporte institucional ponderado (Smart Money Floor)
+            const instPrice = Math.min(...activeSupports);
+
+            institutionalLine = candleSeries.createPriceLine({
+                price: instPrice,
+                color: '#00e5ff',
+                lineWidth: 3,
+                lineStyle: LightweightCharts.LineStyle.Solid,
+                axisLabelVisible: true,
+                title: '🌐 TENDENCIA INSTITUCIONAL (ALCISTA): ACUMULACIÓN BINANCE / BYBIT'
             });
         }
 
